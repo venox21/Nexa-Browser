@@ -1,0 +1,89 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ══════════════════════════════════════════════════════════
+         Premium Dark Color Palette
+         ══════════════════════════════════════════════════════════ -->
+
+    <!-- Backgrounds (deepest → lightest) -->
+    <Color x:Key="BgDeepest">#FF080812</Color>
+    <Color x:Key="BgDeep">#FF0c0c18</Color>
+    <Color x:Key="BgBase">#FF111122</Color>
+    <Color x:Key="BgSurface">#FF17172c</Color>
+    <Color x:Key="BgElevated">#FF1f1f38</Color>
+    <Color x:Key="BgHover">#FF262644</Color>
+    <Color x:Key="BgPressed">#FF2f2f54</Color>
+    <Color x:Key="BgActive">#FF2f2f54</Color>
+
+    <!-- Accent -->
+    <Color x:Key="AccentPrimary">#FF6366f1</Color>
+    <Color x:Key="AccentLight">#FF818cf8</Color>
+    <Color x:Key="AccentDim">#FF4f46e5</Color>
+    <Color x:Key="AccentGlow">#336366f1</Color>
+
+    <!-- Text -->
+    <Color x:Key="TextPrimary">#FFf1f1f8</Color>
+    <Color x:Key="TextSecondary">#FFa5a5c0</Color>
+    <Color x:Key="TextMuted">#FF686882</Color>
+    <Color x:Key="TextDisabled">#FF3e3e54</Color>
+
+    <!-- Borders -->
+    <Color x:Key="BorderSubtle">#FF1e1e36</Color>
+    <Color x:Key="BorderDefault">#FF282848</Color>
+    <Color x:Key="BorderHover">#FF3c3c64</Color>
+    <Color x:Key="BorderAccent">#FF6366f1</Color>
+
+    <!-- Status -->
+    <Color x:Key="StatusSuccess">#FF22c55e</Color>
+    <Color x:Key="StatusWarning">#FFf59e0b</Color>
+    <Color x:Key="StatusError">#FFef4444</Color>
+
+    <!-- Window controls -->
+    <Color x:Key="CloseHover">#FFc42b1c</Color>
+    <Color x:Key="ClosePressed">#FFb22a1a</Color>
+
+    <!-- ── SolidColorBrushes ─────────────────────────────────── -->
+
+    <SolidColorBrush x:Key="BgDeepestBrush" Color="{StaticResource BgDeepest}" />
+    <SolidColorBrush x:Key="BgDeepBrush" Color="{StaticResource BgDeep}" />
+    <SolidColorBrush x:Key="BgBaseBrush" Color="{StaticResource BgBase}" />
+    <SolidColorBrush x:Key="BgSurfaceBrush" Color="{StaticResource BgSurface}" />
+    <SolidColorBrush x:Key="BgElevatedBrush" Color="{StaticResource BgElevated}" />
+    <SolidColorBrush x:Key="BgHoverBrush" Color="{StaticResource BgHover}" />
+    <SolidColorBrush x:Key="BgPressedBrush" Color="{StaticResource BgPressed}" />
+    <SolidColorBrush x:Key="BgActiveBrush" Color="{StaticResource BgActive}" />
+
+    <SolidColorBrush x:Key="AccentPrimaryBrush" Color="{StaticResource AccentPrimary}" />
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentPrimary}" />
+    <SolidColorBrush x:Key="AccentLightBrush" Color="{StaticResource AccentLight}" />
+    <SolidColorBrush x:Key="AccentDimBrush" Color="{StaticResource AccentDim}" />
+    <SolidColorBrush x:Key="AccentGlowBrush" Color="{StaticResource AccentGlow}" />
+
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimary}" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondary}" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMuted}" />
+    <SolidColorBrush x:Key="TextDisabledBrush" Color="{StaticResource TextDisabled}" />
+
+    <SolidColorBrush x:Key="BorderSubtleBrush" Color="{StaticResource BorderSubtle}" />
+    <SolidColorBrush x:Key="BorderDefaultBrush" Color="{StaticResource BorderDefault}" />
+    <SolidColorBrush x:Key="BorderHoverBrush" Color="{StaticResource BorderHover}" />
+    <SolidColorBrush x:Key="BorderAccentBrush" Color="{StaticResource BorderAccent}" />
+
+    <SolidColorBrush x:Key="StatusSuccessBrush" Color="{StaticResource StatusSuccess}" />
+    <SolidColorBrush x:Key="StatusWarningBrush" Color="{StaticResource StatusWarning}" />
+    <SolidColorBrush x:Key="StatusErrorBrush" Color="{StaticResource StatusError}" />
+    <!-- ── AI Chat ─────────────────────────────────────────── -->
+
+    <Color x:Key="AiUserBubble">#332563eb</Color>
+    <Color x:Key="AiAssistantBubble">#FF1a1a32</Color>
+    <Color x:Key="AiStatusOnline">#FF22c55e</Color>
+    <Color x:Key="AiStatusOffline">#FF686882</Color>
+    <Color x:Key="AiSidebarBg">#FF0e0e1c</Color>
+
+    <SolidColorBrush x:Key="AiUserBubbleBrush" Color="{StaticResource AiUserBubble}" />
+    <SolidColorBrush x:Key="AiAssistantBubbleBrush" Color="{StaticResource AiAssistantBubble}" />
+    <SolidColorBrush x:Key="AiStatusOnlineBrush" Color="{StaticResource AiStatusOnline}" />
+    <SolidColorBrush x:Key="AiStatusOfflineBrush" Color="{StaticResource AiStatusOffline}" />
+    <SolidColorBrush x:Key="AiSidebarBgBrush" Color="{StaticResource AiSidebarBg}" />
+
+</ResourceDictionary>

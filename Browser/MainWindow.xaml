@@ -1,0 +1,2505 @@
+<Window x:Class="Browser.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        xmlns:res="clr-namespace:Browser.Resources"
+        xmlns:models="clr-namespace:Browser.Models"
+        xmlns:ai="clr-namespace:Browser.Services.AI"
+        Title="{x:Static res:BrandingConfig.BrowserName}"
+        Icon="Assets/nexa_icon.png"
+        Height="800" Width="1280"
+        MinHeight="400" MinWidth="600"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BgBaseBrush}"
+        WindowStyle="None"
+        AllowsTransparency="False">
+
+    <!-- Custom window chrome for drag/resize while keeping custom title bar -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0"
+                      ResizeBorderThickness="6"
+                      GlassFrameThickness="0"
+                      CornerRadius="0" />
+    </WindowChrome.WindowChrome>
+
+    <Border x:Name="MainBorder"
+            Background="{StaticResource BgBaseBrush}"
+            BorderBrush="{StaticResource BorderSubtleBrush}"
+            BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <!-- Tab bar + Window controls -->
+                <RowDefinition x:Name="TabBarRow" Height="Auto" />
+                <!-- Toolbar -->
+                <RowDefinition x:Name="ToolbarRow" Height="Auto" />
+                <!-- Bookmarks bar -->
+                <RowDefinition Height="Auto" />
+                <!-- WebView2 content -->
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- ═══ Tab bar row (also serves as title bar for dragging) ═══ -->
+            <Grid Grid.Row="0"
+                  Background="{StaticResource BgDeepestBrush}"
+                  MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"
+                  MouseLeftButtonUp="TitleBar_MouseLeftButtonUp">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Tab strip -->
+                <DockPanel Grid.Column="0" Margin="8,6,0,0">
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                        <!-- Scrollable tab list -->
+                        <ScrollViewer HorizontalScrollBarVisibility="Hidden"
+                                      VerticalScrollBarVisibility="Disabled"
+                                      CanContentScroll="False"
+                                      Focusable="False">
+                            <ItemsControl x:Name="TabBar"
+                                          ItemsSource="{Binding Tabs}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border x:Name="TabBorder"
+                                            CornerRadius="8"
+                                            Padding="10,5,8,5"
+                                            Margin="0,2,3,2"
+                                            Height="32"
+                                            MinWidth="90"
+                                            MaxWidth="230"
+                                            Cursor="Hand"
+                                            ToolTip="{Binding SleepToolTip}"
+                                            MouseLeftButtonDown="Tab_MouseLeftButtonDown"
+                                            MouseRightButtonUp="Tab_MouseRightButtonUp"
+                                            Background="Transparent"
+                                            BorderThickness="0,0,0,2"
+                                            BorderBrush="Transparent">
+                                        <DockPanel>
+                                            <!-- Close button -->
+                                            <Button x:Name="TabCloseBtn"
+                                                    DockPanel.Dock="Right"
+                                                    Click="TabClose_Click"
+                                                    Tag="{Binding Id}"
+                                                    Style="{StaticResource TabCloseButtonStyle}" />
+
+                                            <!-- Sleeping indicator -->
+                                            <Border x:Name="TabSleepBadge"
+                                                    DockPanel.Dock="Right"
+                                                    Width="16" Height="16"
+                                                    Margin="0,0,3,0"
+                                                    Background="Transparent"
+                                                    ToolTip="💤 Tab im Ruhezustand (RAM &amp; CPU geschont)"
+                                                    Visibility="Collapsed">
+                                                <TextBlock Text="&#xEC46;"
+                                                           FontFamily="Segoe Fluent Icons"
+                                                           FontSize="10"
+                                                           Foreground="{DynamicResource AccentLightBrush}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center" />
+                                            </Border>
+
+                                            <!-- Audio / Mute Button -->
+                                            <Button x:Name="TabAudioBtn"
+                                                    DockPanel.Dock="Right"
+                                                    Click="TabAudio_Click"
+                                                    Tag="{Binding Id}"
+                                                    ToolTip="{Binding AudioToolTip}"
+                                                    Width="18" Height="18"
+                                                    Margin="0,0,3,0"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Cursor="Hand"
+                                                    Visibility="Collapsed">
+                                                <TextBlock Text="{Binding AudioIconGlyph}"
+                                                           FontFamily="Segoe Fluent Icons"
+                                                           FontSize="11"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center" />
+                                            </Button>
+
+                                            <!-- Favicon / Loading Container -->
+                                            <Grid x:Name="FaviconContainer"
+                                                  DockPanel.Dock="Left"
+                                                  Width="16" Height="16"
+                                                  Margin="0,0,8,0"
+                                                  VerticalAlignment="Center">
+                                                <!-- Default icon when no favicon loaded: Nexa Logo -->
+                                                <Image x:Name="DefaultFavicon"
+                                                       Source="pack://application:,,,/Assets/nexa_icon.png"
+                                                       Width="14" Height="14"
+                                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Visibility="Visible" />
+
+                                                <!-- Settings icon for settings tab -->
+                                                <TextBlock x:Name="SettingsFavicon"
+                                                           Text="&#xE713;"
+                                                           FontFamily="Segoe Fluent Icons"
+                                                           FontSize="11"
+                                                           Foreground="{DynamicResource AccentLightBrush}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Visibility="Collapsed" />
+
+                                                <!-- Favicon image -->
+                                                <Image x:Name="FaviconImage"
+                                                       Source="{Binding FaviconSource}"
+                                                       Width="16" Height="16"
+                                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                                       Visibility="Collapsed" />
+
+                                                <!-- Loading indicator (pulsing dot) -->
+                                                <Ellipse x:Name="LoadingDot"
+                                                         Width="7" Height="7"
+                                                         Fill="{DynamicResource AccentPrimaryBrush}"
+                                                         HorizontalAlignment="Center"
+                                                         VerticalAlignment="Center"
+                                                         Visibility="Collapsed" />
+                                            </Grid>
+
+                                            <!-- Group Pill Badge -->
+                                            <Border x:Name="GroupPill"
+                                                    DockPanel.Dock="Left"
+                                                    Background="{Binding GroupBrush}"
+                                                    CornerRadius="4"
+                                                    Padding="5,1,5,1"
+                                                    Margin="0,0,6,0"
+                                                    VerticalAlignment="Center"
+                                                    Visibility="Collapsed">
+                                                <TextBlock Text="{Binding GroupBadge}"
+                                                           FontSize="9"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="#FFFFFFFF" />
+                                            </Border>
+
+                                            <!-- Tab title -->
+                                            <TextBlock Text="{Binding Title}"
+                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                       FontSize="12"
+                                                       FontFamily="Segoe UI"
+                                                       FontWeight="Normal"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       x:Name="TabTitle" />
+                                        </DockPanel>
+                                    </Border>
+                                    <DataTemplate.Triggers>
+                                        <!-- Grouped tab -->
+                                        <DataTrigger Binding="{Binding IsGrouped}" Value="True">
+                                            <Setter TargetName="GroupPill" Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                        <!-- Active tab -->
+                                        <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                             <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource BgSurfaceBrush}" />
+                                             <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource AccentPrimaryBrush}" />
+                                             <Setter TargetName="TabTitle" Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                                             <Setter TargetName="TabTitle" Property="FontWeight" Value="SemiBold" />
+                                        </DataTrigger>
+                                        <!-- Hover (inactive) -->
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsActive}" Value="False" />
+                                                <Condition Binding="{Binding RelativeSource={RelativeSource AncestorType=Border}, Path=IsMouseOver}" Value="True" />
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource BgHoverBrush}" />
+                                            <Setter TargetName="TabTitle" Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                        </MultiDataTrigger>
+                                        <!-- Sleeping tab -->
+                                        <DataTrigger Binding="{Binding IsSleeping}" Value="True">
+                                            <Setter TargetName="TabSleepBadge" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="TabBorder" Property="Opacity" Value="0.6" />
+                                        </DataTrigger>
+                                        <!-- Settings tab -->
+                                        <DataTrigger Binding="{Binding IsSettingsTab}" Value="True">
+                                            <Setter TargetName="SettingsFavicon" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="DefaultFavicon" Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                        <!-- Has favicon -->
+                                        <DataTrigger Binding="{Binding HasFavicon}" Value="True">
+                                            <Setter TargetName="FaviconImage" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="DefaultFavicon" Property="Visibility" Value="Collapsed" />
+                                            <Setter TargetName="SettingsFavicon" Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                        <!-- Loading state -->
+                                        <DataTrigger Binding="{Binding IsLoading}" Value="True">
+                                            <Setter TargetName="LoadingDot" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="FaviconImage" Property="Visibility" Value="Collapsed" />
+                                            <Setter TargetName="DefaultFavicon" Property="Visibility" Value="Collapsed" />
+                                            <Setter TargetName="SettingsFavicon" Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                        <!-- Audio indicator -->
+                                        <DataTrigger Binding="{Binding ShowAudioIndicator}" Value="True">
+                                            <Setter TargetName="TabAudioBtn" Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                        <!-- Pinned tab -->
+                                        <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                                            <Setter TargetName="TabTitle" Property="Visibility" Value="Collapsed" />
+                                            <Setter TargetName="TabCloseBtn" Property="Visibility" Value="Collapsed" />
+                                            <Setter TargetName="FaviconContainer" Property="Margin" Value="0" />
+                                            <Setter TargetName="TabBorder" Property="MinWidth" Value="36" />
+                                            <Setter TargetName="TabBorder" Property="MaxWidth" Value="36" />
+                                            <Setter TargetName="TabBorder" Property="Padding" Value="10,5,10,5" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                        <!-- New tab button -->
+                        <Button Click="BtnNewTab_Click"
+                                Style="{StaticResource NewTabButtonStyle}"
+                                Margin="4,0,8,0" />
+                    </StackPanel>
+
+                    <!-- Draggable empty title bar area -->
+                    <Border Background="Transparent"
+                            MouseLeftButtonDown="TitleBar_MouseLeftButtonDown" />
+                </DockPanel>
+
+                <!-- Window controls -->
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Top">
+                    <!-- InPrivate / Incognito Badge -->
+                    <Border x:Name="IncognitoBadge"
+                            Background="#FF581C87"
+                            BorderBrush="#FF7C3AED"
+                            BorderThickness="1"
+                            CornerRadius="5"
+                            Padding="6,3"
+                            Margin="0,4,8,0"
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE727;" FontFamily="Segoe Fluent Icons" FontSize="11" Foreground="#FFDDD6FE" Margin="0,0,4,0" VerticalAlignment="Center" />
+                            <TextBlock Text="InPrivate" FontSize="11" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Minimize -->
+                    <Button Click="BtnMinimize_Click"
+                            Style="{StaticResource WindowControlButtonStyle}"
+                            ToolTip="Minimieren">
+                        <TextBlock Text="&#xE921;"
+                                   FontFamily="Segoe Fluent Icons"
+                                   FontSize="10" />
+                    </Button>
+                    <!-- Maximize / Restore -->
+                    <Button x:Name="BtnMaximize"
+                            Click="BtnMaximize_Click"
+                            Style="{StaticResource WindowControlButtonStyle}"
+                            ToolTip="Maximieren">
+                        <TextBlock x:Name="MaximizeIcon"
+                                   Text="&#xE922;"
+                                   FontFamily="Segoe Fluent Icons"
+                                   FontSize="10" />
+                    </Button>
+                    <!-- Close -->
+                    <Button Click="BtnClose_Click"
+                            Style="{StaticResource WindowCloseButtonStyle}"
+                            ToolTip="Schließen">
+                        <TextBlock Text="&#xE8BB;"
+                                   FontFamily="Segoe Fluent Icons"
+                                   FontSize="10" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- ═══ Toolbar & Loading Bar ═══ -->
+            <Grid Grid.Row="1">
+                <Border x:Name="ToolbarBorder"
+                        Background="{StaticResource BgBaseBrush}"
+                        Padding="8,6,8,8"
+                        MouseLeftButtonDown="Toolbar_MouseLeftButtonDown">
+                <DockPanel>
+                    <!-- Navigation buttons -->
+                    <StackPanel DockPanel.Dock="Left"
+                                Orientation="Horizontal"
+                                Margin="0,0,8,0">
+                        <Button x:Name="BtnBack"
+                                Click="BtnBack_Click"
+                                ToolTip="Zurück (Alt+←)"
+                                Style="{StaticResource NavButtonStyle}">
+                            <TextBlock Text="&#xE72B;"
+                                       FontFamily="Segoe Fluent Icons"
+                                       FontSize="14" />
+                        </Button>
+                        <Button x:Name="BtnForward"
+                                Click="BtnForward_Click"
+                                ToolTip="Vor (Alt+→)"
+                                Style="{StaticResource NavButtonStyle}">
+                            <TextBlock Text="&#xE72A;"
+                                       FontFamily="Segoe Fluent Icons"
+                                       FontSize="14" />
+                        </Button>
+                        <Button x:Name="BtnReload"
+                                Click="BtnReload_Click"
+                                ToolTip="Neu laden (F5 / Strg+R)"
+                                Style="{StaticResource NavButtonStyle}">
+                            <TextBlock x:Name="ReloadIcon"
+                                       Text="&#xE72C;"
+                                       FontFamily="Segoe Fluent Icons"
+                                       FontSize="14" />
+                        </Button>
+                        <Button x:Name="BtnHome"
+                                Click="BtnHome_Click"
+                                ToolTip="Startseite (Alt+Pos1)"
+                                Style="{StaticResource NavButtonStyle}">
+                            <TextBlock Text="&#xE80F;"
+                                       FontFamily="Segoe Fluent Icons"
+                                       FontSize="14" />
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Right toolbar action buttons (Downloads, etc.) -->
+                    <StackPanel DockPanel.Dock="Right"
+                                Orientation="Horizontal"
+                                Margin="8,0,0,0">
+                        <!-- Downloads button with badge -->
+                        <Grid>
+                            <Button x:Name="BtnDownloads"
+                                    Click="BtnDownloads_Click"
+                                    ToolTip="Downloads"
+                                    Style="{StaticResource NavButtonStyle}">
+                                <TextBlock Text="&#xE896;"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="14" />
+                            </Button>
+                            <!-- Active download badge -->
+                            <Border x:Name="DownloadBadge"
+                                    Background="{StaticResource AccentPrimaryBrush}"
+                                    CornerRadius="6"
+                                    MinWidth="14" Height="14"
+                                    Padding="3,0"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Top"
+                                    Margin="0,2,2,0"
+                                    IsHitTestVisible="False"
+                                    Visibility="Collapsed">
+                                <TextBlock x:Name="DownloadBadgeCount"
+                                           Text="0"
+                                           FontSize="9"
+                                           FontWeight="SemiBold"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" />
+                            </Border>
+
+                            <!-- Downloads Flyout Popup -->
+                            <Popup x:Name="DownloadsPopup"
+                                   PlacementTarget="{Binding ElementName=BtnDownloads}"
+                                   Placement="Bottom"
+                                   AllowsTransparency="True"
+                                   StaysOpen="False"
+                                   VerticalOffset="6"
+                                   HorizontalOffset="-300">
+                                <Border Background="{StaticResource BgSurfaceBrush}"
+                                        BorderBrush="{StaticResource BorderDefaultBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="10"
+                                        Width="340"
+                                        MaxHeight="420"
+                                        Padding="0">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="12" Direction="270" Opacity="0.4" ShadowDepth="4" Color="#000000" />
+                                    </Border.Effect>
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Header -->
+                                        <Border Grid.Row="0"
+                                                BorderThickness="0,0,0,1"
+                                                BorderBrush="{StaticResource BorderSubtleBrush}"
+                                                Padding="14,10">
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Right"
+                                                        Content="Verlauf leeren"
+                                                        Click="BtnClearDownloads_Click"
+                                                        Foreground="{StaticResource TextMutedBrush}"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        FontSize="11"
+                                                        Cursor="Hand" />
+                                                <TextBlock Text="Downloads"
+                                                           FontWeight="SemiBold"
+                                                           FontSize="13"
+                                                           Foreground="{StaticResource TextPrimaryBrush}" />
+                                            </DockPanel>
+                                        </Border>
+
+                                        <!-- Download List -->
+                                        <ScrollViewer Grid.Row="1"
+                                                      VerticalScrollBarVisibility="Auto"
+                                                      HorizontalScrollBarVisibility="Disabled">
+                                            <ItemsControl x:Name="DownloadsList">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Padding="12,8"
+                                                                BorderThickness="0,0,0,1"
+                                                                BorderBrush="{StaticResource BorderSubtleBrush}">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="28" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+
+                                                                <!-- Status icon -->
+                                                                <TextBlock Grid.Column="0"
+                                                                           Text="&#xE896;"
+                                                                           FontFamily="Segoe Fluent Icons"
+                                                                           FontSize="14"
+                                                                           Foreground="{StaticResource AccentLightBrush}"
+                                                                           VerticalAlignment="Center" />
+
+                                                                <!-- Details -->
+                                                                <StackPanel Grid.Column="1" Margin="4,0,8,0">
+                                                                    <TextBlock Text="{Binding FileName}"
+                                                                               FontWeight="Medium"
+                                                                               FontSize="12"
+                                                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                                                               TextTrimming="CharacterEllipsis" />
+
+                                                                    <TextBlock Text="{Binding StatusText}"
+                                                                               FontSize="11"
+                                                                               Foreground="{StaticResource TextMutedBrush}" />
+
+                                                                    <!-- Security Warning Banner for High Risk Download -->
+                                                                    <Border Visibility="{Binding WarningBadgeVisibility}"
+                                                                            Background="#25EF4444"
+                                                                            BorderBrush="#80EF4444"
+                                                                            BorderThickness="1"
+                                                                            CornerRadius="6"
+                                                                            Padding="6,4"
+                                                                            Margin="0,4,0,0">
+                                                                        <StackPanel>
+                                                                            <TextBlock Text="{Binding RiskReason}" FontSize="10" Foreground="#FFF87171" TextWrapping="Wrap" />
+                                                                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                                                <Button Tag="{Binding}" Content="Verwerfen" Click="BtnDiscardDownload_Click" FontSize="10" Padding="6,2" Background="#40EF4444" Foreground="#FFF87171" BorderThickness="0" Cursor="Hand" Margin="0,0,6,0" />
+                                                                                <Button Tag="{Binding}" Content="Trotzdem behalten" Click="BtnKeepDownload_Click" FontSize="10" Padding="6,2" Background="Transparent" Foreground="{StaticResource TextSecondaryBrush}" BorderThickness="0" Cursor="Hand" />
+                                                                            </StackPanel>
+                                                                        </StackPanel>
+                                                                    </Border>
+                                                                </StackPanel>
+
+                                                                <!-- Action buttons -->
+                                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                    <!-- Cancel button -->
+                                                                    <Button Click="BtnCancelDownload_Click"
+                                                                            ToolTip="Abbrechen"
+                                                                            Tag="{Binding}"
+                                                                            Width="26" Height="26">
+                                                                        <Button.Style>
+                                                                            <Style TargetType="Button" BasedOn="{StaticResource NavButtonStyle}">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding CanCancel}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Button.Style>
+                                                                        <TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="10" />
+                                                                    </Button>
+
+                                                                    <!-- Open File button -->
+                                                                    <Button Click="BtnOpenDownloadFile_Click"
+                                                                            ToolTip="Datei öffnen"
+                                                                            Tag="{Binding}"
+                                                                            Width="26" Height="26">
+                                                                        <Button.Style>
+                                                                            <Style TargetType="Button" BasedOn="{StaticResource NavButtonStyle}">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding CanOpen}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Button.Style>
+                                                                        <TextBlock Text="&#xE8E5;" FontFamily="Segoe Fluent Icons" FontSize="11" />
+                                                                    </Button>
+
+                                                                    <!-- Open Folder button -->
+                                                                    <Button Click="BtnOpenDownloadFolder_Click"
+                                                                            ToolTip="Im Ordner anzeigen"
+                                                                            Tag="{Binding}"
+                                                                            Width="26" Height="26">
+                                                                        <Button.Style>
+                                                                            <Style TargetType="Button" BasedOn="{StaticResource NavButtonStyle}">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding CanOpen}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Button.Style>
+                                                                        <TextBlock Text="&#xE838;" FontFamily="Segoe Fluent Icons" FontSize="11" />
+                                                                    </Button>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </Grid>
+                                </Border>
+                            </Popup>
+                        </Grid>
+
+                        <!-- History button -->
+                        <Grid Margin="4,0,0,0">
+                            <Button x:Name="BtnHistory"
+                                    Click="BtnHistory_Click"
+                                    ToolTip="Verlauf (Strg+H)"
+                                    Style="{StaticResource NavButtonStyle}">
+                                <TextBlock Text="&#xE81C;"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="14" />
+                            </Button>
+
+                            <!-- History Flyout Popup -->
+                            <Popup x:Name="HistoryPopup"
+                                   PlacementTarget="{Binding ElementName=BtnHistory}"
+                                   Placement="Bottom"
+                                   AllowsTransparency="True"
+                                   StaysOpen="False"
+                                   VerticalOffset="6"
+                                   HorizontalOffset="-320">
+                                <Border Background="{StaticResource BgSurfaceBrush}"
+                                        BorderBrush="{StaticResource BorderDefaultBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="10"
+                                        Width="360"
+                                        MaxHeight="450"
+                                        Padding="0">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="12" Direction="270" Opacity="0.4" ShadowDepth="4" Color="#000000" />
+                                    </Border.Effect>
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Header -->
+                                        <Border Grid.Row="0"
+                                                BorderThickness="0,0,0,1"
+                                                BorderBrush="{StaticResource BorderSubtleBrush}"
+                                                Padding="14,10">
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Right"
+                                                        Content="Verlauf leeren"
+                                                        Click="BtnClearHistory_Click"
+                                                        Foreground="{StaticResource TextMutedBrush}"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        FontSize="11"
+                                                        Cursor="Hand" />
+                                                <TextBlock Text="Verlauf"
+                                                           FontWeight="SemiBold"
+                                                           FontSize="13"
+                                                           Foreground="{StaticResource TextPrimaryBrush}" />
+                                            </DockPanel>
+                                        </Border>
+
+                                        <!-- Search input in history -->
+                                        <Border Grid.Row="1"
+                                                Margin="10,8,10,4"
+                                                Background="{StaticResource BgElevatedBrush}"
+                                                BorderBrush="{StaticResource BorderSubtleBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6"
+                                                Padding="8,4">
+                                            <DockPanel>
+                                                <TextBlock DockPanel.Dock="Left"
+                                                           Text="&#xE721;"
+                                                           FontFamily="Segoe Fluent Icons"
+                                                           FontSize="11"
+                                                           Foreground="{StaticResource TextMutedBrush}"
+                                                           VerticalAlignment="Center"
+                                                           Margin="0,0,6,0" />
+                                                <TextBox x:Name="HistorySearchBox"
+                                                         TextChanged="HistorySearchBox_TextChanged"
+                                                         Background="Transparent"
+                                                         BorderThickness="0"
+                                                         Foreground="{StaticResource TextPrimaryBrush}"
+                                                         FontSize="12"
+                                                         CaretBrush="{StaticResource AccentLightBrush}" />
+                                            </DockPanel>
+                                        </Border>
+
+                                        <!-- History List -->
+                                        <ScrollViewer Grid.Row="2"
+                                                      VerticalScrollBarVisibility="Auto"
+                                                      HorizontalScrollBarVisibility="Disabled"
+                                                      Margin="0,4,0,6">
+                                            <ItemsControl x:Name="HistoryList">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Padding="12,6"
+                                                                Cursor="Hand"
+                                                                Background="Transparent"
+                                                                MouseLeftButtonDown="HistoryItem_Click">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+
+                                                                <StackPanel Grid.Column="0">
+                                                                    <TextBlock Text="{Binding Title}"
+                                                                               FontSize="12"
+                                                                               FontWeight="Medium"
+                                                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                                                               TextTrimming="CharacterEllipsis" />
+                                                                    <TextBlock Text="{Binding Url}"
+                                                                               FontSize="11"
+                                                                               Foreground="{StaticResource TextMutedBrush}"
+                                                                               TextTrimming="CharacterEllipsis" />
+                                                                </StackPanel>
+
+                                                                <TextBlock Grid.Column="1"
+                                                                           Text="{Binding DisplayTime}"
+                                                                           FontSize="10"
+                                                                           Foreground="{StaticResource TextDisabledBrush}"
+                                                                           VerticalAlignment="Center"
+                                                                           Margin="8,0" />
+
+                                                                <Button Grid.Column="2"
+                                                                        Click="BtnDeleteHistoryItem_Click"
+                                                                        Tag="{Binding}"
+                                                                        ToolTip="Eintrag entfernen"
+                                                                        Background="Transparent"
+                                                                        BorderThickness="0"
+                                                                        Cursor="Hand"
+                                                                        Width="20" Height="20"
+                                                                        VerticalAlignment="Center">
+                                                                    <TextBlock Text="&#xE711;"
+                                                                               FontFamily="Segoe Fluent Icons"
+                                                                               FontSize="9"
+                                                                               Foreground="{StaticResource TextMutedBrush}" />
+                                                                </Button>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </Grid>
+                                </Border>
+                            </Popup>
+                        </Grid>
+
+                        <!-- AdBlocker button in right toolbar -->
+                        <Grid Margin="4,0,0,0">
+                            <Button x:Name="BtnToolbarAdBlock"
+                                    Click="BtnShield_Click"
+                                    ToolTip="AdBlocker Menü (Ein/Aus)"
+                                    Style="{StaticResource NavButtonStyle}">
+                                <Grid>
+                                    <TextBlock x:Name="ToolbarAdBlockIcon"
+                                               Text="&#xE72E;"
+                                               FontFamily="Segoe Fluent Icons"
+                                               FontSize="14"
+                                               Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <Ellipse x:Name="ToolbarAdBlockDot"
+                                             Width="7" Height="7"
+                                             Fill="#FF10B981"
+                                             HorizontalAlignment="Right"
+                                             VerticalAlignment="Top"
+                                             Margin="0,2,1,0"
+                                             IsHitTestVisible="False" />
+                                </Grid>
+                            </Button>
+                        </Grid>
+
+                        <!-- Split View button -->
+                        <Button x:Name="BtnSplitScreen"
+                                Click="BtnSplitScreen_Click"
+                                ToolTip="Geteilte Ansicht (Strg+\)"
+                                Style="{StaticResource NavButtonStyle}"
+                                Margin="4,0,0,0">
+                            <TextBlock x:Name="SplitScreenIcon"
+                                       Text="&#xE740;"
+                                       FontFamily="Segoe Fluent Icons"
+                                       FontSize="14" />
+                        </Button>
+
+                        <!-- Quick Search button -->
+                        <Button x:Name="BtnQuickSearch"
+                                Click="BtnQuickSearch_Click"
+                                ToolTip="Schnellsuche (Strg+K)"
+                                Style="{StaticResource NavButtonStyle}"
+                                Margin="4,0,0,0">
+                            <TextBlock Text="&#xE721;"
+                                       FontFamily="Segoe Fluent Icons"
+                                       FontSize="14" />
+                        </Button>
+
+                        <!-- AI Assistant button -->
+                        <Grid Margin="4,0,0,0">
+                            <Button x:Name="BtnAiChat"
+                                    Click="BtnAiChat_Click"
+                                    ToolTip="Nexa KI (Strg+Umschalt+A)"
+                                    Style="{StaticResource NavButtonStyle}">
+                                <TextBlock x:Name="AiChatIcon"
+                                           Text="&#xE945;"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="14" />
+                            </Button>
+                            <!-- AI status dot -->
+                            <Ellipse x:Name="AiStatusDot"
+                                     Width="7" Height="7"
+                                     Fill="{StaticResource AiStatusOfflineBrush}"
+                                     HorizontalAlignment="Right"
+                                     VerticalAlignment="Top"
+                                     Margin="0,3,3,0"
+                                     IsHitTestVisible="False" />
+                        </Grid>
+
+                        <!-- Theme Color Picker button -->
+                        <Grid Margin="4,0,0,0">
+                            <Button x:Name="BtnThemePicker"
+                                    Click="BtnThemePicker_Click"
+                                    ToolTip="Farbwelten &amp; Themes (1-Klick)"
+                                    Style="{StaticResource NavButtonStyle}">
+                                <TextBlock Text="&#xE790;"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="14"
+                                           Foreground="{DynamicResource AccentLightBrush}" />
+                            </Button>
+
+                            <!-- Theme Flyout Popup -->
+                            <Popup x:Name="ThemePopup"
+                                   PlacementTarget="{Binding ElementName=BtnThemePicker}"
+                                   Placement="Bottom"
+                                   AllowsTransparency="True"
+                                   StaysOpen="False"
+                                   VerticalOffset="6"
+                                   HorizontalOffset="-180">
+                                <Border Background="{StaticResource BgSurfaceBrush}"
+                                        BorderBrush="{StaticResource BorderDefaultBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="12"
+                                        Width="230"
+                                        Padding="12">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="16" Direction="270" Opacity="0.5" ShadowDepth="4" Color="#000000" />
+                                    </Border.Effect>
+                                    <StackPanel>
+                                        <DockPanel Margin="2,2,2,10">
+                                            <TextBlock Text="&#xE790;" FontFamily="Segoe Fluent Icons" FontSize="13" Foreground="{DynamicResource AccentLightBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="Theme-Farbwelten" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                        </DockPanel>
+                                        
+                                        <ItemsControl x:Name="ListThemePicker">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border x:Name="ThemeOptionBorder"
+                                                            CornerRadius="8"
+                                                            Padding="8,6"
+                                                            Margin="0,0,0,3"
+                                                            Cursor="Hand"
+                                                            Background="Transparent"
+                                                            MouseLeftButtonDown="ThemeOption_Click">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Style.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter Property="Background" Value="{StaticResource BgHoverBrush}" />
+                                                                    </Trigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <DockPanel LastChildFill="True">
+                                                            <Border Width="16" Height="16" CornerRadius="8" Background="{Binding PrimaryBrush}" BorderBrush="#50FFFFFF" BorderThickness="1" Margin="0,0,10,0" VerticalAlignment="Center">
+                                                                <Border.Effect>
+                                                                    <DropShadowEffect BlurRadius="6" Direction="0" ShadowDepth="0" Color="{Binding Primary}" Opacity="0.6" />
+                                                                </Border.Effect>
+                                                            </Border>
+                                                            <TextBlock Text="{Binding Name}" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                                        </DockPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                            </Popup>
+                        </Grid>
+
+                        <!-- Main App Menu button -->
+                        <Grid Margin="4,0,0,0">
+                            <Button x:Name="BtnAppMenu"
+                                    Click="BtnAppMenu_Click"
+                                    ToolTip="Menü (Alt+F)"
+                                    Style="{StaticResource NavButtonStyle}">
+                                <TextBlock Text="&#xE712;"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="14" />
+                            </Button>
+
+                            <!-- App Menu Popup -->
+                            <Popup x:Name="AppMenuPopup"
+                                   PlacementTarget="{Binding ElementName=BtnAppMenu}"
+                                   Placement="Bottom"
+                                   AllowsTransparency="True"
+                                   StaysOpen="False"
+                                   VerticalOffset="6"
+                                   HorizontalOffset="-200">
+                                <Border Background="{StaticResource BgSurfaceBrush}"
+                                        BorderBrush="{StaticResource BorderDefaultBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Width="230"
+                                        Padding="4">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="12" Direction="270" Opacity="0.4" ShadowDepth="4" Color="#000000" />
+                                    </Border.Effect>
+                                    <StackPanel>
+                                        <MenuItem Header="🔍 Schnellsuche" InputGestureText="Strg+K" Click="BtnQuickSearch_Click" Style="{StaticResource ModernMenuItemStyle}" />
+                                        <Separator Style="{StaticResource ModernMenuSeparator}" />
+                                        <MenuItem Header="Neues Fenster" InputGestureText="Strg+N" Click="MenuNewWindow_Click" Style="{StaticResource ModernMenuItemStyle}" />
+                                        <MenuItem Header="Neues InPrivate-Fenster" InputGestureText="Strg+Umschalt+N" Click="MenuNewIncognito_Click" Style="{StaticResource ModernMenuItemStyle}" />
+                                        <Separator Style="{StaticResource ModernMenuSeparator}" />
+                                        <MenuItem Header="Geteilte Ansicht umschalten" InputGestureText="Strg+\" Click="MenuSplitView_Click" Style="{StaticResource ModernMenuItemStyle}" />
+                                        <Separator Style="{StaticResource ModernMenuSeparator}" />
+                                        <MenuItem Header="Seite speichern unter..." InputGestureText="Strg+S" Click="MenuSavePage_Click" Style="{StaticResource ModernMenuItemStyle}" />
+                                        <MenuItem Header="Drucken..." InputGestureText="Strg+P" Click="MenuPrint_Click" Style="{StaticResource ModernMenuItemStyle}" />
+                                        <MenuItem Header="Suchen auf Seite..." InputGestureText="Strg+F" Click="MenuFind_Click" Style="{StaticResource ModernMenuItemStyle}" />
+                                        <Separator Style="{StaticResource ModernMenuSeparator}" />
+                                        <MenuItem Header="Lesezeichenleiste umschalten" Click="MenuToggleBookmarksBar_Click" Style="{StaticResource ModernMenuItemStyle}" />
+                                        <MenuItem Header="Browserdaten löschen..." InputGestureText="Strg+Umschalt+Entf" Click="MenuClearData_Click" Style="{StaticResource ModernMenuItemStyle}" />
+                                        <MenuItem Header="Vollbild" InputGestureText="F11" Click="MenuFullscreen_Click" Style="{StaticResource ModernMenuItemStyle}" />
+                                        <Separator Style="{StaticResource ModernMenuSeparator}" />
+                                        <MenuItem Header="Picture-in-Picture umschalten" Click="MenuPip_Click" Style="{StaticResource ModernMenuItemStyle}" />
+                                        <MenuItem Header="Browser-Task-Manager" InputGestureText="Umschalt+Esc" Click="MenuTaskManager_Click" Style="{StaticResource ModernMenuItemStyle}" />
+                                        <MenuItem Header="Lesezeichen importieren..." Click="MenuImport_Click" Style="{StaticResource ModernMenuItemStyle}" />
+                                        <MenuItem Header="🔑 Passwort-Tresor" Click="MenuPasswordVault_Click" Style="{StaticResource ModernMenuItemStyle}" />
+                                        <MenuItem Header="☁️ Konto &amp; Cloud-Sync" Click="MenuGoogleSync_Click" Style="{StaticResource ModernMenuItemStyle}" />
+                                        <MenuItem Header="Einstellungen" Click="MenuSettings_Click" Style="{StaticResource ModernMenuItemStyle}" />
+                                    </StackPanel>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- Address bar with Security Badge & Bookmark Star -->
+                    <Border x:Name="AddressBarBorder"
+                            CornerRadius="12"
+                            Height="34"
+                            Padding="8,0,8,0"
+                            Background="{StaticResource BgSurfaceBrush}"
+                            BorderBrush="{StaticResource BorderSubtleBrush}"
+                            BorderThickness="1">
+                        <Border.Effect>
+                            <DropShadowEffect x:Name="AddressBarGlow"
+                                              BlurRadius="16"
+                                              Direction="0"
+                                              ShadowDepth="0"
+                                              Color="{DynamicResource AccentPrimary}"
+                                              Opacity="0" />
+                        </Border.Effect>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Security / Protocol indicator badge & Flyout -->
+                            <Grid Grid.Column="0">
+                                <Border x:Name="SecurityBadge"
+                                        CornerRadius="6"
+                                        Padding="5,2"
+                                        Margin="0,0,4,0"
+                                        VerticalAlignment="Center"
+                                        Background="Transparent"
+                                        Cursor="Hand"
+                                        MouseLeftButtonUp="SecurityBadge_MouseLeftButtonUp"
+                                        ToolTip="Sicherheits- und Website-Informationen anzeigen">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="{DynamicResource BgHoverBrush}" />
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid VerticalAlignment="Center">
+                                        <Image x:Name="SecurityLogo"
+                                               Source="pack://application:,,,/Assets/nexa_icon.png"
+                                               Width="14" Height="14"
+                                               RenderOptions.BitmapScalingMode="HighQuality"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Visibility="Collapsed" />
+                                        <TextBlock x:Name="SecurityIcon"
+                                                   Text="&#xE72E;"
+                                                   FontFamily="Segoe Fluent Icons"
+                                                   FontSize="12"
+                                                   Foreground="#FF10B981"
+                                                   VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+
+                                <!-- Omnibox Security Flyout Popup -->
+                                <Popup x:Name="SecurityPopup"
+                                       PlacementTarget="{Binding ElementName=SecurityBadge}"
+                                       Placement="Bottom"
+                                       AllowsTransparency="True"
+                                       StaysOpen="False"
+                                       VerticalOffset="8"
+                                       HorizontalOffset="-4">
+                                    <Border Background="{StaticResource BgSurfaceBrush}"
+                                            BorderBrush="{StaticResource BorderDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="14"
+                                            Width="330"
+                                            Padding="16">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="24" Direction="270" Opacity="0.55" ShadowDepth="6" Color="#000000" />
+                                        </Border.Effect>
+                                        <StackPanel>
+                                            <!-- Header: Status & Connection -->
+                                            <DockPanel Margin="0,0,0,12">
+                                                <Border x:Name="SecurityHeaderIconBorder" Width="36" Height="36" Background="#2810B981" CornerRadius="10" DockPanel.Dock="Left" Margin="0,0,10,0">
+                                                    <TextBlock x:Name="SecurityHeaderIcon" Text="&#xE72E;" FontFamily="Segoe Fluent Icons" FontSize="16" Foreground="#FF10B981" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <Border x:Name="SecurityStatusBadgeBorder" DockPanel.Dock="Right" Background="#2810B981" CornerRadius="10" Padding="8,3" VerticalAlignment="Center">
+                                                    <TextBlock x:Name="TxtSecurityStatusBadge" Text="Sicher" FontSize="10" FontWeight="Bold" Foreground="#FF10B981" />
+                                                </Border>
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock x:Name="TxtSecurityHostTitle" Text="Aktuelle Website" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock x:Name="TxtSecurityStatusSubtitle" Text="Verbindung ist sicher" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </DockPanel>
+
+                                            <!-- Connection Details Info Box -->
+                                            <Border Background="{StaticResource BgBaseBrush}" CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
+                                                <StackPanel>
+                                                    <DockPanel Margin="0,0,0,4">
+                                                        <TextBlock Text="Zertifikat:" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                                                        <TextBlock x:Name="TxtSecurityCertInfo" Text="Gültig (TLS 1.3 / HTTPS)" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Right" />
+                                                    </DockPanel>
+                                                    <TextBlock x:Name="TxtSecurityDetailsText"
+                                                               Text="Deine Verbindung zu dieser Website ist privat. Passwörter und Zahlungsdaten sind geschützt."
+                                                               FontSize="10.5"
+                                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                                               TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Cookies & Website Data Card -->
+                                            <Border Background="{StaticResource BgElevatedBrush}" CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
+                                                <StackPanel>
+                                                    <DockPanel Margin="0,0,0,8">
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <TextBlock Text="&#xE7BA;" FontFamily="Segoe Fluent Icons" FontSize="12" Foreground="{DynamicResource AccentLightBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                            <TextBlock Text="Cookies &amp; Websitedaten" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                        <TextBlock x:Name="TxtSecurityCookiesCount" Text="0 Cookies" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentLightBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                    </DockPanel>
+                                                    
+                                                    <Button x:Name="BtnDeleteSiteCookies"
+                                                            Click="BtnDeleteSiteCookies_Click"
+                                                            Content="🗑️ Cookies dieser Website löschen"
+                                                            Height="28"
+                                                            Background="{StaticResource BgSurfaceBrush}"
+                                                            Foreground="{StaticResource TextPrimaryBrush}"
+                                                            BorderBrush="{StaticResource BorderSubtleBrush}"
+                                                            BorderThickness="1"
+                                                            FontSize="11"
+                                                            FontWeight="Medium"
+                                                            Cursor="Hand"
+                                                            HorizontalAlignment="Stretch">
+                                                        <Button.Resources>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="CornerRadius" Value="6" />
+                                                            </Style>
+                                                        </Button.Resources>
+                                                    </Button>
+                                                    <TextBlock x:Name="TxtSecurityCookiesNotice"
+                                                               Text=""
+                                                               FontSize="10.5"
+                                                               Foreground="#FF10B981"
+                                                               Margin="0,5,0,0"
+                                                               Visibility="Collapsed" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Nexa Shield Tracker Stats -->
+                                            <Border Background="{StaticResource BgElevatedBrush}" CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
+                                                <DockPanel>
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <TextBlock Text="&#xE72E;" FontFamily="Segoe Fluent Icons" FontSize="12" Foreground="#FF10B981" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                        <TextBlock Text="Nexa Privacy Shield" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                    <TextBlock x:Name="TxtSecurityShieldBlocked" Text="0 blockiert" FontSize="11" FontWeight="Bold" Foreground="#FF10B981" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                </DockPanel>
+                                            </Border>
+
+                                            <!-- Permissions Quick Regulators -->
+                                            <TextBlock Text="Berechtigungen dieser Website" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}" Margin="2,0,0,6" />
+                                            
+                                            <Border Background="{StaticResource BgElevatedBrush}" CornerRadius="6" Padding="10,6" Margin="0,0,0,4">
+                                                <DockPanel>
+                                                    <TextBlock Text="📍 Standort" FontSize="11.5" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                                    <CheckBox x:Name="ChkPermLocation" Click="PermToggle_Click" Tag="Geolocation" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand" />
+                                                </DockPanel>
+                                            </Border>
+                                            
+                                            <Border Background="{StaticResource BgElevatedBrush}" CornerRadius="6" Padding="10,6" Margin="0,0,0,4">
+                                                <DockPanel>
+                                                    <TextBlock Text="📷 Kamera" FontSize="11.5" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                                    <CheckBox x:Name="ChkPermCamera" Click="PermToggle_Click" Tag="Camera" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand" />
+                                                </DockPanel>
+                                            </Border>
+
+                                            <Border Background="{StaticResource BgElevatedBrush}" CornerRadius="6" Padding="10,6" Margin="0,0,0,4">
+                                                <DockPanel>
+                                                    <TextBlock Text="🎤 Mikrofon" FontSize="11.5" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                                    <CheckBox x:Name="ChkPermMicrophone" Click="PermToggle_Click" Tag="Microphone" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand" />
+                                                </DockPanel>
+                                            </Border>
+
+                                            <Border Background="{StaticResource BgElevatedBrush}" CornerRadius="6" Padding="10,6" Margin="0,0,0,2">
+                                                <DockPanel>
+                                                    <TextBlock Text="🔔 Benachrichtigungen" FontSize="11.5" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                                    <CheckBox x:Name="ChkPermNotifications" Click="PermToggle_Click" Tag="Notifications" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand" />
+                                                </DockPanel>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+
+                            <TextBox Grid.Column="1"
+                                     x:Name="AddressBar"
+                                     Margin="0,0,6,0"
+                                     KeyDown="AddressBar_KeyDown"
+                                     TextChanged="AddressBar_TextChanged"
+                                     GotFocus="AddressBar_GotFocus"
+                                     LostFocus="AddressBar_LostFocus"
+                                     Style="{StaticResource AddressBarStyle}" />
+
+                            <!-- Omnibox right actions (Shield + Bookmark) -->
+                            <StackPanel Grid.Column="2"
+                                        Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center">
+                                <!-- Privacy Shield button -->
+                                <Grid>
+                                    <Button x:Name="BtnShield"
+                                            Click="BtnShield_Click"
+                                            ToolTip="AdBlocker Menü (Ein/Aus)"
+                                            Width="28" Height="26"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Cursor="Hand"
+                                            Margin="0,0,2,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock x:Name="ShieldIcon"
+                                                       Text="&#xE72E;"
+                                                       FontFamily="Segoe Fluent Icons"
+                                                       FontSize="13"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       VerticalAlignment="Center" />
+                                            <Border x:Name="ShieldBadge"
+                                                    Background="{StaticResource AccentDimBrush}"
+                                                    CornerRadius="4"
+                                                    Padding="3,0"
+                                                    Margin="3,0,0,0"
+                                                    VerticalAlignment="Center"
+                                                    Visibility="Collapsed">
+                                                <TextBlock x:Name="ShieldBadgeText"
+                                                           Text="0"
+                                                           FontSize="9"
+                                                           FontWeight="Bold"
+                                                           Foreground="{StaticResource AccentLightBrush}" />
+                                            </Border>
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- Shield Flyout Popup (AdBlocker Menu) -->
+                                    <Popup x:Name="ShieldPopup"
+                                           PlacementTarget="{Binding ElementName=BtnShield}"
+                                           Placement="Bottom"
+                                           AllowsTransparency="True"
+                                           StaysOpen="False"
+                                           VerticalOffset="6"
+                                           HorizontalOffset="-230">
+                                        <Border Background="{StaticResource BgSurfaceBrush}"
+                                                BorderBrush="{StaticResource BorderDefaultBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="12"
+                                                Width="280"
+                                                Padding="16">
+                                            <Border.Effect>
+                                                <DropShadowEffect BlurRadius="20" Direction="270" Opacity="0.5" ShadowDepth="5" Color="#000000" />
+                                            </Border.Effect>
+                                            <StackPanel>
+                                                <!-- Header -->
+                                                <DockPanel Margin="0,0,0,12">
+                                                    <Border x:Name="ShieldHeaderIconBorder" Width="34" Height="34" Background="#2810B981" CornerRadius="8" DockPanel.Dock="Left" Margin="0,0,10,0">
+                                                        <TextBlock x:Name="ShieldHeaderIcon" Text="&#xE72E;" FontFamily="Segoe Fluent Icons" FontSize="16" Foreground="#FF10B981" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Border>
+                                                    <Border DockPanel.Dock="Right" Background="{StaticResource BgBaseBrush}" CornerRadius="10" Padding="8,2" VerticalAlignment="Center">
+                                                        <TextBlock x:Name="TxtAdBlockStatusBadge" Text="Aktiv" FontSize="11" FontWeight="Bold" Foreground="#FF10B981" />
+                                                    </Border>
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <TextBlock Text="AdBlocker" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                        <TextBlock x:Name="TxtShieldHost" Text="Aktuelle Website" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                </DockPanel>
+
+                                                <!-- Blocked counter card -->
+                                                <Border Background="{StaticResource BgBaseBrush}" CornerRadius="8" Padding="12,10" Margin="0,0,0,12">
+                                                    <DockPanel>
+                                                        <TextBlock Text="Blockiert:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                                                        <TextBlock x:Name="TxtShieldBlockedCount" Text="0 Tracker &amp; Werbung" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentLightBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                    </DockPanel>
+                                                </Border>
+
+                                                <!-- Global On/Off Master Toggle -->
+                                                <Border Background="{StaticResource BgElevatedBrush}" CornerRadius="8" Padding="10,8" Margin="0,0,0,8">
+                                                    <DockPanel>
+                                                        <CheckBox x:Name="ChkShieldGlobalToggle"
+                                                                  IsChecked="True"
+                                                                  Click="ChkShieldGlobalToggle_Click"
+                                                                  DockPanel.Dock="Right"
+                                                                  VerticalAlignment="Center"
+                                                                  Margin="6,0,0,0" />
+                                                        <StackPanel VerticalAlignment="Center">
+                                                            <TextBlock Text="AdBlocker allgemein" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                            <TextBlock Text="Global ein- oder ausschalten" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                </Border>
+
+                                                <!-- Toggle for this site -->
+                                                <Border Background="{StaticResource BgElevatedBrush}" CornerRadius="8" Padding="10,8" Margin="0,0,0,8">
+                                                    <DockPanel>
+                                                        <CheckBox x:Name="ChkShieldSiteToggle"
+                                                                  IsChecked="True"
+                                                                  Click="ChkShieldSiteToggle_Click"
+                                                                  DockPanel.Dock="Right"
+                                                                  VerticalAlignment="Center"
+                                                                  Margin="6,0,0,0" />
+                                                        <StackPanel VerticalAlignment="Center">
+                                                            <TextBlock Text="Auf dieser Website aktiv" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                            <TextBlock Text="Schutz nur für diese Domain" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                </Border>
+
+                                                <!-- YouTube AdBlocker toggle -->
+                                                <Border Background="{StaticResource BgElevatedBrush}" CornerRadius="8" Padding="10,8" Margin="0,0,0,10">
+                                                    <DockPanel>
+                                                        <CheckBox x:Name="ChkShieldYouTubeToggle"
+                                                                  IsChecked="True"
+                                                                  Click="ChkShieldYouTubeToggle_Click"
+                                                                  DockPanel.Dock="Right"
+                                                                  VerticalAlignment="Center"
+                                                                  Margin="6,0,0,0" />
+                                                        <StackPanel VerticalAlignment="Center">
+                                                            <TextBlock Text="YouTube Werbeblocker" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                            <TextBlock Text="Video-Werbung überspringen" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                </Border>
+
+                                                <!-- Reload button -->
+                                                <Button Click="BtnShieldReload_Click"
+                                                        Height="30"
+                                                        Background="{StaticResource AccentDimBrush}"
+                                                        Foreground="{StaticResource AccentLightBrush}"
+                                                        BorderThickness="0"
+                                                        Cursor="Hand"
+                                                        Margin="0,0,0,2">
+                                                    <Button.Resources>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="CornerRadius" Value="6" />
+                                                        </Style>
+                                                    </Button.Resources>
+                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                        <TextBlock Text="&#xE72C;" FontFamily="Segoe Fluent Icons" FontSize="11" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                        <TextBlock Text="Seite neu laden" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </StackPanel>
+                                        </Border>
+                                    </Popup>
+                                </Grid>
+
+                                <!-- Page Translation button (Gemini AI) -->
+                                <Button x:Name="BtnTranslatePage"
+                                        Click="BtnTranslatePage_Click"
+                                        ToolTip="Diese Seite mit Gemini ins Deutsche übersetzen"
+                                        Width="26" Height="26"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Cursor="Hand"
+                                        Margin="0,0,2,0">
+                                    <TextBlock x:Name="TranslatePageIcon"
+                                               Text="&#xE774;"
+                                               FontFamily="Segoe Fluent Icons"
+                                               FontSize="13"
+                                               Foreground="{StaticResource TextSecondaryBrush}" />
+                                </Button>
+
+                                <!-- Bookmark star button -->
+                                <Button x:Name="BtnBookmarkStar"
+                                        Click="BtnBookmarkStar_Click"
+                                        ToolTip="Lesezeichen für diese Seite (Strg+D)"
+                                        Width="26" Height="26"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Cursor="Hand">
+                                    <TextBlock x:Name="BookmarkStarIcon"
+                                               Text="&#xE734;"
+                                               FontFamily="Segoe Fluent Icons"
+                                               FontSize="13"
+                                               Foreground="{StaticResource TextMutedBrush}" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Omnibox Suggestions Popup -->
+                    <Popup x:Name="OmniboxSuggestionsPopup"
+                           PlacementTarget="{Binding ElementName=AddressBarBorder}"
+                           Placement="Bottom"
+                           AllowsTransparency="True"
+                           StaysOpen="False"
+                           Focusable="False"
+                           VerticalOffset="4"
+                           Width="{Binding ElementName=AddressBarBorder, Path=ActualWidth}">
+                        <Border Background="{StaticResource BgSurfaceBrush}"
+                                BorderBrush="{StaticResource BorderDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                MaxHeight="420"
+                                Padding="4">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="18" Direction="270" Opacity="0.45" ShadowDepth="4" Color="#000000" />
+                            </Border.Effect>
+                            <ListBox x:Name="ListSuggestions"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     PreviewMouseLeftButtonUp="ListSuggestions_PreviewMouseLeftButtonUp"
+                                     Focusable="False">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Padding" Value="10,7" />
+                                        <Setter Property="Margin" Value="0,1" />
+                                        <Setter Property="Cursor" Value="Hand" />
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <Border x:Name="Bd"
+                                                            Background="{TemplateBinding Background}"
+                                                            CornerRadius="6"
+                                                            Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter />
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgHoverBrush}" />
+                                                        </Trigger>
+                                                        <Trigger Property="IsSelected" Value="True">
+                                                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentDimBrush}" />
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <!-- Standard Suggestion -->
+                                            <DockPanel Visibility="{Binding StandardVisibility}">
+                                                <!-- Icon -->
+                                                <TextBlock Text="{Binding IconGlyph}"
+                                                           FontFamily="Segoe Fluent Icons"
+                                                           FontSize="13"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           DockPanel.Dock="Left"
+                                                           VerticalAlignment="Center"
+                                                           Margin="0,0,10,0" />
+
+                                                <!-- Optional Badge -->
+                                                <Border DockPanel.Dock="Right"
+                                                        Background="{Binding BadgeBrush}"
+                                                        CornerRadius="4"
+                                                        Padding="6,2"
+                                                        Margin="8,0,0,0"
+                                                        VerticalAlignment="Center"
+                                                        Visibility="{Binding BadgeVisibility}">
+                                                    <TextBlock Text="{Binding Badge}"
+                                                               FontSize="9"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="#FFFFFFFF" />
+                                                </Border>
+
+                                                <!-- Title and URL -->
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Title}"
+                                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                                               FontSize="12"
+                                                               FontWeight="Medium"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding DisplayUrl}"
+                                                               Foreground="{StaticResource TextMutedBrush}"
+                                                               FontSize="10"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Margin="0,1,0,0" />
+                                                </StackPanel>
+                                            </DockPanel>
+
+                                            <!-- AI Quick Answer Card -->
+                                            <Border Visibility="{Binding AiVisibility}"
+                                                    Background="#1A8B5CF6"
+                                                    BorderBrush="#558B5CF6"
+                                                    BorderThickness="1"
+                                                    CornerRadius="8"
+                                                    Padding="10,8"
+                                                    Margin="0,1">
+                                                <StackPanel>
+                                                    <DockPanel Margin="0,0,0,5">
+                                                        <Border DockPanel.Dock="Left" Background="#338B5CF6" CornerRadius="4" Padding="5,2" Margin="0,0,8,0">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="&#xE945;" FontFamily="Segoe Fluent Icons" FontSize="11" Foreground="#FFA78BFA" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                                                <TextBlock Text="Gemini Direktantwort" FontSize="10" FontWeight="Bold" Foreground="#FFA78BFA" VerticalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                        <TextBlock Text="Enter für Vollsuche" FontSize="9" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                    </DockPanel>
+                                                    <TextBlock Text="{Binding Title}"
+                                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                                               FontSize="12"
+                                                               FontWeight="Normal"
+                                                               TextWrapping="Wrap"
+                                                               LineHeight="18" />
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+                    </Popup>
+                </DockPanel>
+            </Border>
+
+            <!-- Modern Gradient Page Loading Bar -->
+            <Grid x:Name="LoadingBarContainer"
+                  VerticalAlignment="Bottom"
+                  HorizontalAlignment="Stretch"
+                  Height="2.5"
+                  Visibility="Collapsed"
+                  IsHitTestVisible="False">
+                <Border x:Name="LoadingBarProgress"
+                        HorizontalAlignment="Left"
+                        Width="0">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="{DynamicResource AccentDim}" Offset="0.0" />
+                            <GradientStop Color="{DynamicResource AccentPrimary}" Offset="0.5" />
+                            <GradientStop Color="{DynamicResource AccentLight}" Offset="1.0" />
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+            </Grid>
+        </Grid>
+
+            <!-- ═══ Bookmarks bar ═══ -->
+            <Border Grid.Row="2"
+                    x:Name="BookmarksBar"
+                    Background="{StaticResource BgDeepBrush}"
+                    Height="28"
+                    Padding="10,0"
+                    BorderThickness="0,0,0,1"
+                    BorderBrush="{StaticResource BorderSubtleBrush}">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Disabled">
+                    <ItemsControl x:Name="BookmarksList">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Cursor="Hand"
+                                        CornerRadius="4"
+                                        Padding="6,3"
+                                        Margin="0,0,4,0"
+                                        Background="Transparent"
+                                        ToolTip="{Binding Url}"
+                                        MouseLeftButtonDown="BookmarkBarItem_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE735;"
+                                                   FontFamily="Segoe Fluent Icons"
+                                                   FontSize="11"
+                                                   Foreground="#FFF59E0B"
+                                                   Margin="0,0,5,0"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding Title}"
+                                                   FontSize="11"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                   MaxWidth="130"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Border>
+
+            <!-- ═══ Content area (WebView2 + Overlays + AI Sidebar) ═══ -->
+            <Grid Grid.Row="3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- ═══ Main Web Content Host & Overlays ═══ -->
+                <Grid Grid.Column="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- In-Place Banners Host (Airspace Safe) -->
+                    <StackPanel Grid.Row="0">
+                        <!-- In-Place Translation Bar Overlay -->
+                        <Border x:Name="TranslationBanner"
+                                VerticalAlignment="Top"
+                                HorizontalAlignment="Stretch"
+                                Background="{StaticResource BgSurfaceBrush}"
+                                BorderBrush="{StaticResource BorderDefaultBrush}"
+                                BorderThickness="0,0,0,1"
+                                Padding="14,8"
+                                Visibility="Collapsed">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="12" Direction="270" Opacity="0.3" ShadowDepth="2" Color="#000000" />
+                            </Border.Effect>
+                            <DockPanel>
+                                <Button x:Name="BtnCloseTranslationBanner"
+                                        DockPanel.Dock="Right"
+                                        Click="BtnCloseTranslationBanner_Click"
+                                        Style="{StaticResource TabCloseButtonStyle}"
+                                        ToolTip="Schließen">
+                                    <TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="10" />
+                                </Button>
+
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" Margin="0,0,12,0" VerticalAlignment="Center">
+                                    <Button x:Name="BtnRevertTranslation"
+                                            Click="BtnRevertTranslation_Click"
+                                            Content="Original anzeigen"
+                                            FontSize="11"
+                                            FontWeight="SemiBold"
+                                            Padding="10,4"
+                                            Background="{StaticResource BgHoverBrush}"
+                                            Foreground="{StaticResource TextPrimaryBrush}"
+                                            BorderThickness="1"
+                                            BorderBrush="{StaticResource BorderSubtleBrush}"
+                                            Cursor="Hand"
+                                            Margin="0,0,6,0">
+                                        <Button.Resources>
+                                            <Style TargetType="Border">
+                                                <Setter Property="CornerRadius" Value="6" />
+                                            </Style>
+                                        </Button.Resources>
+                                    </Button>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE774;"
+                                               FontFamily="Segoe Fluent Icons"
+                                               FontSize="14"
+                                               Foreground="{StaticResource AccentLightBrush}"
+                                               Margin="0,0,8,0"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock x:Name="TxtTranslationStatus"
+                                               Text="Seite wird ins Deutsche übersetzt..."
+                                               FontSize="12"
+                                               FontWeight="Medium"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <!-- In-Place Password Save / Update Offer Banner -->
+                        <Border x:Name="PasswordSaveBanner"
+                                VerticalAlignment="Top"
+                                HorizontalAlignment="Stretch"
+                                Background="{StaticResource BgSurfaceBrush}"
+                                BorderBrush="{StaticResource BorderDefaultBrush}"
+                                BorderThickness="0,0,0,1"
+                                Padding="14,9"
+                                Visibility="Collapsed">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="12" Direction="270" Opacity="0.35" ShadowDepth="2" Color="#000000" />
+                            </Border.Effect>
+                            <DockPanel LastChildFill="True">
+                                <Button x:Name="BtnClosePasswordBanner"
+                                        DockPanel.Dock="Right"
+                                        Click="BtnClosePasswordBanner_Click"
+                                        Style="{StaticResource TabCloseButtonStyle}"
+                                        ToolTip="Schließen">
+                                    <TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="10" />
+                                </Button>
+
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" Margin="0,0,12,0" VerticalAlignment="Center">
+                                    <Button x:Name="BtnNeverSavePassword"
+                                            Click="BtnNeverSavePassword_Click"
+                                            Content="Nicht jetzt"
+                                            FontSize="11"
+                                            FontWeight="Normal"
+                                            Padding="10,5"
+                                            Background="Transparent"
+                                            Foreground="{StaticResource TextMutedBrush}"
+                                            BorderThickness="0"
+                                            Cursor="Hand"
+                                            Margin="0,0,8,0" />
+                                    <Button x:Name="BtnSavePassword"
+                                            Click="BtnSavePassword_Click"
+                                            Content="Passwort speichern"
+                                            FontSize="11"
+                                            FontWeight="SemiBold"
+                                            Padding="14,5"
+                                            Background="{StaticResource AccentPrimaryBrush}"
+                                            Foreground="White"
+                                            BorderThickness="0"
+                                            Cursor="Hand"
+                                            Margin="0,0,4,0">
+                                        <Button.Resources>
+                                            <Style TargetType="Border">
+                                                <Setter Property="CornerRadius" Value="6" />
+                                            </Style>
+                                        </Button.Resources>
+                                    </Button>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Background="#224285F4" CornerRadius="6" Padding="6,4" Margin="0,0,10,0">
+                                        <TextBlock Text="&#xE8AC;"
+                                                   FontFamily="Segoe Fluent Icons"
+                                                   FontSize="14"
+                                                   Foreground="#FF4285F4"
+                                                   VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock x:Name="TxtPasswordBannerText"
+                                               Text="Möchtest du das Passwort für diesen Account im Nexa Tresor speichern?"
+                                               FontSize="12"
+                                               FontWeight="Medium"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Grid hosting Primary & Split views -->
+                    <Grid Grid.Row="1" x:Name="SplitHostGrid">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition x:Name="SplitColPrimary" Width="*" />
+                            <ColumnDefinition x:Name="SplitColSplitter" Width="Auto" />
+                            <ColumnDefinition x:Name="SplitColSecondary" Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Left / Primary WebView2 Host -->
+                        <Grid x:Name="WebViewHost" Grid.Column="0" />
+
+                        <!-- GridSplitter for resizing split views -->
+                        <GridSplitter x:Name="SplitResizer"
+                                      Grid.Column="1"
+                                      Width="4"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Stretch"
+                                      Background="{StaticResource BorderSubtleBrush}"
+                                      ShowsPreview="False"
+                                      Visibility="Collapsed" />
+
+                        <!-- Right / Secondary WebView2 Host -->
+                        <Grid x:Name="SecondaryHost" Grid.Column="2" Visibility="Collapsed">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <!-- Split Header bar -->
+                            <Border Grid.Row="0"
+                                    Background="{StaticResource BgDeepBrush}"
+                                    BorderBrush="{StaticResource BorderSubtleBrush}"
+                                    BorderThickness="0,0,0,1"
+                                    Padding="10,6">
+                                <DockPanel>
+                                    <Button x:Name="BtnCloseSplit"
+                                            DockPanel.Dock="Right"
+                                            Click="BtnCloseSplit_Click"
+                                            ToolTip="Geteilte Ansicht schließen (Strg+\)"
+                                            Style="{StaticResource TabCloseButtonStyle}">
+                                        <TextBlock Text="&#xE711;"
+                                                   FontFamily="Segoe Fluent Icons"
+                                                   FontSize="10" />
+                                    </Button>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="&#xE740;"
+                                                   FontFamily="Segoe Fluent Icons"
+                                                   FontSize="11"
+                                                   Foreground="{StaticResource AccentLightBrush}"
+                                                   Margin="0,0,6,0"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock x:Name="TxtSplitTitle"
+                                                   Text="Geteilte Ansicht"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                   FontSize="11"
+                                                   FontWeight="Medium"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   MaxWidth="250"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock x:Name="TxtSplitUrl"
+                                                   Text=""
+                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                   FontSize="10"
+                                                   Margin="8,0,0,0"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   MaxWidth="250"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+
+                            <!-- Secondary WebView content host -->
+                            <Grid x:Name="SecondaryWebViewHost" Grid.Row="1" />
+                        </Grid>
+                    </Grid>
+
+                    <!-- ═══ Find-in-Page Bar overlay ═══ -->
+                    <Border x:Name="FindBar"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="0,10,16,0"
+                            Background="{StaticResource BgSurfaceBrush}"
+                            BorderBrush="{StaticResource BorderDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="6,4"
+                            Panel.ZIndex="100"
+                            Visibility="Collapsed">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="12" Direction="270" Opacity="0.45" ShadowDepth="4" Color="#000000" />
+                        </Border.Effect>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBox x:Name="FindTextBox"
+                                     Width="170"
+                                     Height="26"
+                                     FontSize="12"
+                                     Padding="6,2"
+                                     Background="{StaticResource BgElevatedBrush}"
+                                     BorderBrush="{StaticResource BorderSubtleBrush}"
+                                     BorderThickness="1"
+                                     Foreground="{StaticResource TextPrimaryBrush}"
+                                     CaretBrush="{StaticResource AccentLightBrush}"
+                                     KeyDown="FindTextBox_KeyDown"
+                                     TextChanged="FindTextBox_TextChanged" />
+
+                            <!-- Prev button -->
+                            <Button Click="BtnFindPrev_Click"
+                                    ToolTip="Vorheriges (Umschalt+Eingabe)"
+                                    Style="{StaticResource NavButtonStyle}"
+                                    Width="26" Height="26"
+                                    Margin="4,0,0,0">
+                                <TextBlock Text="&#xE70E;" FontFamily="Segoe Fluent Icons" FontSize="11" />
+                            </Button>
+
+                            <!-- Next button -->
+                            <Button Click="BtnFindNext_Click"
+                                    ToolTip="Nächstes (Eingabe)"
+                                    Style="{StaticResource NavButtonStyle}"
+                                    Width="26" Height="26"
+                                    Margin="2,0,0,0">
+                                <TextBlock Text="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="11" />
+                            </Button>
+
+                            <!-- Close button -->
+                            <Button Click="BtnFindClose_Click"
+                                    ToolTip="Schließen (Esc)"
+                                    Style="{StaticResource NavButtonStyle}"
+                                    Width="26" Height="26"
+                                    Margin="4,0,0,0">
+                                <TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="10" />
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ═══ Status bar overlay ═══ -->
+                    <Border Padding="12,5"
+                            VerticalAlignment="Bottom"
+                            HorizontalAlignment="Left"
+                            CornerRadius="0,8,0,0"
+                            Visibility="Collapsed"
+                            x:Name="StatusBar"
+                            MaxWidth="450">
+                        <Border.Background>
+                            <SolidColorBrush Color="{StaticResource BgDeep}" Opacity="0.92" />
+                        </Border.Background>
+                        <TextBlock x:Name="StatusText"
+                                   Text=""
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   FontSize="11"
+                                   FontFamily="Segoe UI"
+                                   TextTrimming="CharacterEllipsis" />
+                    </Border>
+                </Grid>
+
+                <!-- ═══ AI Assistant Sidebar ═══ -->
+                <Border x:Name="AiSidebar"
+                        Grid.Column="1"
+                        Width="0"
+                        Visibility="Collapsed"
+                        Background="{StaticResource AiSidebarBgBrush}"
+                        BorderBrush="{StaticResource BorderSubtleBrush}"
+                        BorderThickness="1,0,0,0"
+                        ClipToBounds="True">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <!-- Header -->
+                            <RowDefinition Height="Auto" />
+                            <!-- Context Badges Drawer -->
+                            <RowDefinition Height="Auto" />
+                            <!-- Coding Agent Confirmation Bar -->
+                            <RowDefinition Height="Auto" />
+                            <!-- Model Loading Progress -->
+                            <RowDefinition Height="Auto" />
+                            <!-- Chat Messages -->
+                            <RowDefinition Height="*" />
+                            <!-- Input Area -->
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- ── Header ── -->
+                        <Border Grid.Row="0"
+                                Background="{StaticResource BgDeepBrush}"
+                                BorderBrush="{StaticResource BorderSubtleBrush}"
+                                BorderThickness="0,0,0,1"
+                                Padding="12,8,8,8">
+                            <DockPanel LastChildFill="True">
+                                <!-- Right actions -->
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <!-- Context toggle button -->
+                                    <Button x:Name="BtnAiToggleContext"
+                                            Click="BtnAiToggleContext_Click"
+                                            ToolTip="Kontext-Optionen anpassen"
+                                            Style="{StaticResource AiIconButtonStyle}"
+                                            Margin="0,0,2,0">
+                                        <TextBlock Text="&#xE774;" FontFamily="Segoe Fluent Icons" FontSize="12" />
+                                    </Button>
+
+                                    <!-- New chat button -->
+                                    <Button x:Name="BtnAiNewChat"
+                                            Click="BtnAiNewChat_Click"
+                                            ToolTip="Neuer Chat"
+                                            Style="{StaticResource AiIconButtonStyle}"
+                                            Margin="0,0,2,0">
+                                        <TextBlock Text="&#xE72D;" FontFamily="Segoe Fluent Icons" FontSize="12" />
+                                    </Button>
+
+                                    <!-- Close button -->
+                                    <Button x:Name="BtnAiClose"
+                                            Click="BtnAiClose_Click"
+                                            ToolTip="Schließen (Strg+Umschalt+A)"
+                                            Style="{StaticResource AiIconButtonStyle}">
+                                        <TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="11" />
+                                    </Button>
+                                </StackPanel>
+
+                                <!-- Left: Title & Status -->
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE945;"
+                                               FontFamily="Segoe Fluent Icons"
+                                               FontSize="15"
+                                               Foreground="{StaticResource AccentLightBrush}"
+                                               Margin="0,0,8,0"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Text="Nexa KI"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center" />
+
+                                    <!-- Backend status pill / dropdown -->
+                                    <Border Margin="10,0,0,0"
+                                            Background="{StaticResource BgElevatedBrush}"
+                                            CornerRadius="10"
+                                            Padding="6,2"
+                                            Cursor="Hand"
+                                            MouseLeftButtonUp="AiBackendBadge_Click"
+                                            ToolTip="Klicken zum Umschalten zwischen Ollama und LM Studio">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Ellipse x:Name="AiSidebarStatusDot"
+                                                     Width="6" Height="6"
+                                                     Fill="{StaticResource AiStatusOfflineBrush}"
+                                                     Margin="0,0,5,0"
+                                                     VerticalAlignment="Center" />
+                                            <TextBlock x:Name="AiBackendNameText"
+                                                       Text="Ollama"
+                                                       FontSize="10"
+                                                       FontWeight="Medium"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Model selector badge -->
+                                    <Border x:Name="AiModelBadgeBorder"
+                                            Margin="4,0,0,0"
+                                            Background="{StaticResource BgElevatedBrush}"
+                                            CornerRadius="10"
+                                            Padding="6,2"
+                                            Cursor="Hand"
+                                            MouseLeftButtonUp="AiModelBadge_Click"
+                                            ToolTip="KI-Modell wechseln">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE945;"
+                                                       FontFamily="Segoe Fluent Icons"
+                                                       FontSize="9"
+                                                       Foreground="{StaticResource AccentLightBrush}"
+                                                       Margin="0,0,4,0"
+                                                       VerticalAlignment="Center" />
+                                            <TextBlock x:Name="AiModelNameText"
+                                                       Text="Qwen2.5-0.5B"
+                                                       FontSize="10"
+                                                       FontWeight="Medium"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <!-- ── Context Badges Drawer (Collapsible) ── -->
+                        <Border x:Name="AiContextDrawer"
+                                Grid.Row="1"
+                                Background="{StaticResource BgSurfaceBrush}"
+                                BorderBrush="{StaticResource BorderSubtleBrush}"
+                                BorderThickness="0,0,0,1"
+                                Padding="12,6"
+                                Visibility="Collapsed">
+                            <StackPanel>
+                                <TextBlock Text="Aktiver Browser-Kontext für Prompts:"
+                                           FontSize="10"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           Margin="0,0,0,4" />
+                                <WrapPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="ChkContextUrl"
+                                              Content="URL"
+                                              Style="{StaticResource AiContextChipStyle}"
+                                              IsChecked="True"
+                                              Click="ContextChip_Click"
+                                              ToolTip="Aktuelle Web-Adresse an die KI übergeben" />
+                                    <CheckBox x:Name="ChkContextTitle"
+                                              Content="Titel"
+                                              Style="{StaticResource AiContextChipStyle}"
+                                              IsChecked="True"
+                                              Click="ContextChip_Click"
+                                              ToolTip="Seitentitel an die KI übergeben" />
+                                    <CheckBox x:Name="ChkContextSelection"
+                                              Content="Auswahl"
+                                              Style="{StaticResource AiContextChipStyle}"
+                                              Click="ContextChip_Click"
+                                              ToolTip="Aktuell markierten Text an die KI übergeben" />
+                                    <CheckBox x:Name="ChkContextPage"
+                                              Content="Seite"
+                                              Style="{StaticResource AiContextChipStyle}"
+                                              Click="ContextChip_Click"
+                                              ToolTip="Textinhalt der gesamten Seite an die KI übergeben" />
+                                    <CheckBox x:Name="ChkContextTabs"
+                                              Content="Tabs"
+                                              Style="{StaticResource AiContextChipStyle}"
+                                              Click="ContextChip_Click"
+                                              ToolTip="Liste geöffneter Tabs an die KI übergeben" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- ── Coding Agent Confirmation Bar ── -->
+                        <Border x:Name="AiConfirmationBar"
+                                Grid.Row="2"
+                                Background="#2A1B0E"
+                                BorderBrush="#D97706"
+                                BorderThickness="0,0,0,1"
+                                Padding="12,8"
+                                Visibility="Collapsed">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="&#xE7BA;" FontFamily="Segoe Fluent Icons" FontSize="13" Foreground="#F59E0B" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="Coding-Agent Bestätigung erforderlich" FontSize="11" FontWeight="SemiBold" Foreground="#F59E0B" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock x:Name="TxtConfirmationPrompt" Text="" TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6" />
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button x:Name="BtnConfirmReject" Click="BtnConfirmReject_Click" Content="Ablehnen" Margin="0,0,6,0" Padding="10,4" FontSize="11" Background="Transparent" Foreground="{StaticResource TextSecondaryBrush}" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" />
+                                    <Button x:Name="BtnConfirmAccept" Click="BtnConfirmAccept_Click" Content="Ausführen" Padding="10,4" FontSize="11" Background="{DynamicResource AccentPrimaryBrush}" Foreground="White" BorderThickness="0" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- ── Model Loading Progress Panel ── -->
+                        <Border x:Name="AiModelLoadingPanel"
+                                Grid.Row="3"
+                                Background="{StaticResource BgSurfaceBrush}"
+                                BorderBrush="{StaticResource BorderSubtleBrush}"
+                                BorderThickness="0,0,0,1"
+                                Padding="14,10"
+                                Visibility="Collapsed">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <TextBlock Text="&#xE896;"
+                                               FontFamily="Segoe Fluent Icons"
+                                               FontSize="13"
+                                               Foreground="{StaticResource AccentLightBrush}"
+                                               Margin="0,0,6,0"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock x:Name="AiModelLoadingTitle"
+                                               Text="KI-Modell wird geladen..."
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                                <Grid Margin="0,0,0,4">
+                                    <ProgressBar x:Name="AiModelProgressBar"
+                                                 Height="4"
+                                                 Minimum="0" Maximum="100"
+                                                 Value="0"
+                                                 Background="{StaticResource BgElevatedBrush}"
+                                                 Foreground="{DynamicResource AccentPrimaryBrush}"
+                                                 BorderThickness="0" />
+                                </Grid>
+                                <TextBlock x:Name="AiModelLoadingStatus"
+                                           Text="Vorbereitung..."
+                                           FontSize="10"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- ── Chat Messages ── -->
+                        <ScrollViewer x:Name="AiChatScrollViewer"
+                                      Grid.Row="4"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      Padding="10,8">
+                            <Grid>
+                                <!-- Empty state placeholder -->
+                                <StackPanel x:Name="AiEmptyState"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Center"
+                                            Margin="16,24">
+                                    <Border Width="48" Height="48"
+                                            CornerRadius="24"
+                                            Background="{StaticResource BgElevatedBrush}"
+                                            BorderBrush="{StaticResource BorderSubtleBrush}"
+                                            BorderThickness="1"
+                                            HorizontalAlignment="Center"
+                                            Margin="0,0,0,12">
+                                        <TextBlock Text="&#xE945;"
+                                                   FontFamily="Segoe Fluent Icons"
+                                                   FontSize="22"
+                                                   Foreground="{StaticResource AccentLightBrush}"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock Text="Wie kann ich dir helfen?"
+                                               FontSize="15"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,0,0,6" />
+                                    <TextBlock Text="Stelle Fragen zur aktuellen Webseite, lasse Inhalte zusammenfassen oder nutze lokale KI-Modelle ohne Cloud-Zwang."
+                                               FontSize="12"
+                                               TextWrapping="Wrap"
+                                               TextAlignment="Center"
+                                               Foreground="{StaticResource TextMutedBrush}"
+                                               MaxWidth="280"
+                                               LineHeight="16"
+                                               Margin="0,0,0,16" />
+
+                                    <!-- Quick Prompt Chips -->
+                                    <StackPanel Orientation="Vertical">
+                                        <Border Cursor="Hand" Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,0,0,6" MouseLeftButtonUp="AiQuickPrompt_Click" Tag="Fasse die aktuelle Webseite kurz und übersichtlich auf Deutsch zusammen.">
+                                            <TextBlock Text="📄 Diese Seite zusammenfassen" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </Border>
+                                        <Border Cursor="Hand" Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,0,0,6" MouseLeftButtonUp="AiQuickPrompt_Click" Tag="Erkläre mir die Kernaussagen und wichtigsten Fakten des aktuellen Inhalts.">
+                                            <TextBlock Text="💡 Kernaussagen erklären" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </Border>
+                                        <Border Cursor="Hand" Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6" MouseLeftButtonUp="AiQuickPrompt_Click" Tag="Welche Themen werden auf den geöffneten Tabs behandelt?">
+                                            <TextBlock Text="🗂️ Geöffnete Tabs analysieren" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </Border>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- Message Items -->
+                                <ItemsControl x:Name="AiMessagesControl">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,4">
+                                                <!-- User Message -->
+                                                <Border x:Name="UserBubble"
+                                                        HorizontalAlignment="Right"
+                                                        Background="{StaticResource AiUserBubbleBrush}"
+                                                        BorderBrush="{StaticResource BorderAccentBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="14,14,2,14"
+                                                        Padding="12,8"
+                                                        MaxWidth="300"
+                                                        Visibility="Collapsed">
+                                                    <StackPanel>
+                                                        <Border x:Name="ContextBadge"
+                                                                Background="#20FFFFFF"
+                                                                CornerRadius="4"
+                                                                Padding="6,2"
+                                                                Margin="0,0,0,4"
+                                                                HorizontalAlignment="Left"
+                                                                Visibility="Collapsed">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="&#xE774;" FontFamily="Segoe Fluent Icons" FontSize="9" Foreground="{StaticResource AccentLightBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                                                <TextBlock Text="{Binding ContextInfo}" FontSize="9" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                        <TextBox Text="{Binding Content, Mode=OneWay}"
+                                                                 TextWrapping="Wrap"
+                                                                 IsReadOnly="True"
+                                                                 Background="Transparent"
+                                                                 BorderThickness="0"
+                                                                 Foreground="{StaticResource TextPrimaryBrush}"
+                                                                 FontSize="12.5"
+                                                                 FontFamily="Segoe UI"
+                                                                 Cursor="Arrow"
+                                                                 CaretBrush="Transparent" />
+                                                        <TextBlock Text="{Binding DisplayTime}"
+                                                                   FontSize="9"
+                                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                                   HorizontalAlignment="Right"
+                                                                   Margin="0,3,0,0" />
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <!-- Assistant Message -->
+                                                <Border x:Name="AssistantBubble"
+                                                        HorizontalAlignment="Left"
+                                                        Background="{StaticResource AiAssistantBubbleBrush}"
+                                                        BorderBrush="{StaticResource BorderSubtleBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="14,14,14,2"
+                                                        Padding="12,8"
+                                                        MaxWidth="310"
+                                                        Visibility="Collapsed">
+                                                    <StackPanel>
+                                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                            <TextBlock Text="&#xE945;" FontFamily="Segoe Fluent Icons" FontSize="11" Foreground="{StaticResource AccentLightBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                                            <TextBlock Text="Nexa KI" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                        <TextBox Text="{Binding Content, Mode=OneWay}"
+                                                                 TextWrapping="Wrap"
+                                                                 IsReadOnly="True"
+                                                                 Background="Transparent"
+                                                                 BorderThickness="0"
+                                                                 Foreground="{StaticResource TextPrimaryBrush}"
+                                                                 FontSize="12.5"
+                                                                 FontFamily="Segoe UI"
+                                                                 Cursor="IBeam"
+                                                                 CaretBrush="{StaticResource AccentLightBrush}" />
+                                                        <StackPanel x:Name="StreamingIndicator"
+                                                                    Orientation="Horizontal"
+                                                                    Margin="0,4,0,0"
+                                                                    Visibility="Collapsed">
+                                                            <TextBlock Text="✦ antwortet..."
+                                                                       FontSize="10"
+                                                                       FontStyle="Italic"
+                                                                       Foreground="{StaticResource AccentLightBrush}" />
+                                                        </StackPanel>
+                                                        <TextBlock Text="{Binding DisplayTime}"
+                                                                   FontSize="9"
+                                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                                   HorizontalAlignment="Right"
+                                                                   Margin="0,3,0,0" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
+
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsUser}" Value="True">
+                                                    <Setter TargetName="UserBubble" Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsAssistant}" Value="True">
+                                                    <Setter TargetName="AssistantBubble" Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsStreaming}" Value="True">
+                                                    <Setter TargetName="StreamingIndicator" Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding HasContext}" Value="True">
+                                                    <Setter TargetName="ContextBadge" Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                        </ScrollViewer>
+
+                        <!-- ── Input Area ── -->
+                        <Border Grid.Row="5"
+                                Background="{StaticResource BgDeepBrush}"
+                                BorderBrush="{StaticResource BorderSubtleBrush}"
+                                BorderThickness="0,1,0,0"
+                                Padding="10,8">
+                            <StackPanel>
+                                <!-- Quick Action Buttons -->
+                                <StackPanel x:Name="AiQuickActionsBar"
+                                            Orientation="Horizontal"
+                                            Margin="0,0,0,6">
+                                    <Border Background="{StaticResource BgElevatedBrush}"
+                                            BorderBrush="{StaticResource BorderSubtleBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Padding="8,4"
+                                            Margin="0,0,4,0"
+                                            Cursor="Hand"
+                                            MouseLeftButtonUp="AiSmartAction_Summarize"
+                                            ToolTip="Aktuelle Seite zusammenfassen">
+                                        <TextBlock Text="📄 TL;DR" FontSize="10" FontWeight="Medium"
+                                                   Foreground="{StaticResource TextSecondaryBrush}" />
+                                    </Border>
+                                    <Border Background="{StaticResource BgElevatedBrush}"
+                                            BorderBrush="{StaticResource BorderSubtleBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Padding="8,4"
+                                            Margin="0,0,4,0"
+                                            Cursor="Hand"
+                                            MouseLeftButtonUp="AiSmartAction_Translate"
+                                            ToolTip="Markierten Text übersetzen">
+                                        <TextBlock Text="🌍 Übersetzen" FontSize="10" FontWeight="Medium"
+                                                   Foreground="{StaticResource TextSecondaryBrush}" />
+                                    </Border>
+                                    <Border Background="{StaticResource BgElevatedBrush}"
+                                            BorderBrush="{StaticResource BorderSubtleBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Padding="8,4"
+                                            Cursor="Hand"
+                                            MouseLeftButtonUp="AiSmartAction_ExplainCode"
+                                            ToolTip="Markierten Code erklären">
+                                        <TextBlock Text="💡 Erklären" FontSize="10" FontWeight="Medium"
+                                                   Foreground="{StaticResource TextSecondaryBrush}" />
+                                    </Border>
+                                </StackPanel>
+                                <Border Background="{StaticResource BgElevatedBrush}"
+                                        BorderBrush="{StaticResource BorderSubtleBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="10"
+                                        Padding="10,6">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Placeholder Text -->
+                                        <TextBlock x:Name="AiInputPlaceholder"
+                                                   Grid.Row="0"
+                                                   Text="Frage etwas zur aktuellen Seite... (Enter = Senden)"
+                                                   Foreground="{StaticResource TextDisabledBrush}"
+                                                   FontSize="12"
+                                                   IsHitTestVisible="False"
+                                                   VerticalAlignment="Top"
+                                                   Margin="2,2,0,0" />
+
+                                        <!-- Multiline Input Box -->
+                                        <TextBox x:Name="AiChatInput"
+                                                 Grid.Row="0"
+                                                 Style="{StaticResource AiChatInputStyle}"
+                                                 MinHeight="36"
+                                                 MaxHeight="120"
+                                                 PreviewKeyDown="AiChatInput_PreviewKeyDown"
+                                                 TextChanged="AiChatInput_TextChanged" />
+
+                                        <!-- Bottom actions inside input card -->
+                                        <DockPanel Grid.Row="1" Margin="0,6,0,0">
+                                            <!-- Mini context status -->
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock x:Name="AiActiveContextText"
+                                                           Text="🌐 URL · Titel"
+                                                           FontSize="10"
+                                                           Foreground="{StaticResource TextMutedBrush}"
+                                                           VerticalAlignment="Center" />
+                                            </StackPanel>
+
+                                            <!-- Send / Stop button -->
+                                            <Button x:Name="BtnAiSend"
+                                                    DockPanel.Dock="Right"
+                                                    Click="BtnAiSend_Click"
+                                                    Style="{StaticResource AiSendButtonStyle}">
+                                                <TextBlock x:Name="AiSendButtonIcon"
+                                                           Text="&#xE724;"
+                                                           FontFamily="Segoe Fluent Icons"
+                                                           FontSize="12" />
+                                            </Button>
+                                        </DockPanel>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Footer label -->
+                                <TextBlock Text="Lokale KI · Keine Cloud-Übertragung"
+                                           FontSize="9.5"
+                                           Foreground="{StaticResource TextDisabledBrush}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+            <!-- Hidden host for background AI WebLLM WebView2 worker -->
+            <Grid x:Name="AiHiddenWebViewHost" Width="0" Height="0" Opacity="0" Focusable="False" IsHitTestVisible="False" ClipToBounds="True" />
+
+            <!-- ════════════════════════════════════════════════════════════ -->
+            <!-- Quick Search Overlay (Spotlight / Command Palette)         -->
+            <!-- ════════════════════════════════════════════════════════════ -->
+            <Grid x:Name="QuickSearchOverlay" Visibility="Collapsed" Panel.ZIndex="9999">
+                <!-- Dimmed backdrop -->
+                <Border x:Name="QuickSearchBackdrop"
+                        Background="#99000000"
+                        MouseDown="QuickSearchBackdrop_MouseDown" />
+
+                <!-- Center-aligned search panel -->
+                <Border x:Name="QuickSearchPanel"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Top"
+                        Margin="0,120,0,0"
+                        Width="620"
+                        MaxHeight="520"
+                        Background="{StaticResource BgSurfaceBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="16"
+                        RenderTransformOrigin="0.5,0">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="28" Direction="270" Opacity="0.6" ShadowDepth="8" Color="#000000" />
+                    </Border.Effect>
+                    <Border.RenderTransform>
+                        <ScaleTransform ScaleX="1" ScaleY="1" />
+                    </Border.RenderTransform>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Search Input Row -->
+                        <Border Grid.Row="0" Padding="16,16,16,0">
+                            <Border Background="{StaticResource BgElevatedBrush}"
+                                    BorderBrush="{StaticResource BorderDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="4">
+                                <DockPanel>
+                                    <TextBlock Text="&#xE721;"
+                                               FontFamily="Segoe Fluent Icons"
+                                               FontSize="18"
+                                               Foreground="{StaticResource TextMutedBrush}"
+                                               VerticalAlignment="Center"
+                                               Margin="12,0,8,0"
+                                               DockPanel.Dock="Left" />
+                                    <Grid VerticalAlignment="Center">
+                                        <TextBlock x:Name="QuickSearchPlaceholder"
+                                                   Text="Tabs, Lesezeichen, Verlauf durchsuchen..."
+                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                   FontSize="15"
+                                                   Padding="4,10"
+                                                   VerticalAlignment="Center"
+                                                   IsHitTestVisible="False" />
+                                        <TextBox x:Name="QuickSearchInput"
+                                                 Background="Transparent"
+                                                 BorderThickness="0"
+                                                 Foreground="{StaticResource TextPrimaryBrush}"
+                                                 CaretBrush="{StaticResource AccentPrimaryBrush}"
+                                                 FontSize="15"
+                                                 Padding="4,10"
+                                                 VerticalAlignment="Center"
+                                                 TextChanged="QuickSearchInput_TextChanged"
+                                                 PreviewKeyDown="QuickSearchInput_PreviewKeyDown" />
+                                    </Grid>
+                                </DockPanel>
+                            </Border>
+                        </Border>
+
+                        <!-- Category filter chips -->
+                        <Border Grid.Row="1" Padding="16,10,16,4">
+                            <StackPanel Orientation="Horizontal">
+                                <Border x:Name="QsFilterAll" Background="{StaticResource AccentGlowBrush}" CornerRadius="10" Padding="10,4" Margin="0,0,6,0" Cursor="Hand" MouseDown="QsFilter_Click" Tag="all">
+                                    <TextBlock x:Name="QsFilterAllText" Text="Alle" FontSize="11" Foreground="{StaticResource AccentLightBrush}" FontWeight="SemiBold" />
+                                </Border>
+                                <Border x:Name="QsFilterTabs" Background="{StaticResource BgElevatedBrush}" CornerRadius="10" Padding="10,4" Margin="0,0,6,0" Cursor="Hand" MouseDown="QsFilter_Click" Tag="tabs">
+                                    <TextBlock x:Name="QsFilterTabsText" Text="📄 Offene Tabs" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                </Border>
+                                <Border x:Name="QsFilterBookmarks" Background="{StaticResource BgElevatedBrush}" CornerRadius="10" Padding="10,4" Margin="0,0,6,0" Cursor="Hand" MouseDown="QsFilter_Click" Tag="bookmarks">
+                                    <TextBlock x:Name="QsFilterBookmarksText" Text="⭐ Lesezeichen" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                </Border>
+                                <Border x:Name="QsFilterHistory" Background="{StaticResource BgElevatedBrush}" CornerRadius="10" Padding="10,4" Margin="0,0,6,0" Cursor="Hand" MouseDown="QsFilter_Click" Tag="history">
+                                    <TextBlock x:Name="QsFilterHistoryText" Text="🕐 Verlauf" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                </Border>
+                                <Border x:Name="QsFilterActions" Background="{StaticResource BgElevatedBrush}" CornerRadius="10" Padding="10,4" Cursor="Hand" MouseDown="QsFilter_Click" Tag="actions">
+                                    <TextBlock x:Name="QsFilterActionsText" Text="⚡ Aktionen" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Results list -->
+                        <Border Grid.Row="2" Padding="8,4,8,8">
+                            <ListBox x:Name="QuickSearchResults"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     SelectionChanged="QuickSearchResults_SelectionChanged"
+                                     MouseDoubleClick="QuickSearchResults_MouseDoubleClick"
+                                     MaxHeight="340"
+                                     VirtualizingPanel.IsVirtualizing="True">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <Border x:Name="ItemBorder"
+                                                            Background="Transparent"
+                                                            CornerRadius="10"
+                                                            Padding="12,10"
+                                                            Margin="4,1"
+                                                            Cursor="Hand">
+                                                        <ContentPresenter />
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsSelected" Value="True">
+                                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource AccentGlowBrush}" />
+                                                        </Trigger>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource BgElevatedBrush}" />
+                                                        </Trigger>
+                                                        <MultiTrigger>
+                                                            <MultiTrigger.Conditions>
+                                                                <Condition Property="IsSelected" Value="True" />
+                                                                <Condition Property="IsMouseOver" Value="True" />
+                                                            </MultiTrigger.Conditions>
+                                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource AccentGlowBrush}" />
+                                                        </MultiTrigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Setter Property="Focusable" Value="False" />
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel>
+                                            <!-- Category icon -->
+                                            <Border Width="32" Height="32" CornerRadius="8"
+                                                    Background="{StaticResource BgElevatedBrush}"
+                                                    DockPanel.Dock="Left" Margin="0,0,12,0"
+                                                    VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Icon}"
+                                                           FontSize="15"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center" />
+                                            </Border>
+                                            <!-- Shortcut hint -->
+                                            <TextBlock Text="{Binding Hint}"
+                                                       DockPanel.Dock="Right"
+                                                       FontSize="10"
+                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="8,0,0,0" />
+                                            <!-- Title + Subtitle -->
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Title}"
+                                                           FontSize="13"
+                                                           FontWeight="Medium"
+                                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Subtitle}"
+                                                           FontSize="11"
+                                                           Foreground="{StaticResource TextMutedBrush}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Margin="0,1,0,0" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+
+                        <!-- Footer with keyboard hints -->
+                        <Border Grid.Row="3"
+                                Background="{StaticResource BgElevatedBrush}"
+                                CornerRadius="0,0,16,16"
+                                Padding="16,8">
+                            <DockPanel>
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                    <Border Background="{StaticResource BgSurfaceBrush}" CornerRadius="4" Padding="6,2" Margin="0,0,4,0">
+                                        <TextBlock Text="↑↓" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
+                                    </Border>
+                                    <TextBlock Text="Navigieren" FontSize="10" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                    <Border Background="{StaticResource BgSurfaceBrush}" CornerRadius="4" Padding="6,2" Margin="0,0,4,0">
+                                        <TextBlock Text="Enter" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
+                                    </Border>
+                                    <TextBlock Text="Öffnen" FontSize="10" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                    <Border Background="{StaticResource BgSurfaceBrush}" CornerRadius="4" Padding="6,2" Margin="0,0,4,0">
+                                        <TextBlock Text="Esc" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
+                                    </Border>
+                                    <TextBlock Text="Schließen" FontSize="10" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock x:Name="QuickSearchResultCount"
+                                           Text=""
+                                           FontSize="10"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           VerticalAlignment="Center" />
+                            </DockPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

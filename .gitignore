@@ -1,0 +1,27 @@
+# .NET build output
+**/bin/
+**/obj/
+
+# Nexa build artifacts
+publish/
+dist/
+scratch/
+NexaInstaller/Resources/app.zip
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs and temporary files
+*.log
+*.tmp
+thumbs.db
+desktop.ini
+
+# Windows installer output in root (can be built locally via Build-Installer.ps1)
+# Uncomment if you want to exclude root setup exe:
+# NexaSetup.exe

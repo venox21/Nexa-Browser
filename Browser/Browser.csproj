@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>Nexa</AssemblyName>
+    <RootNamespace>Browser</RootNamespace>
+    <ApplicationIcon>Assets\nexa.ico</ApplicationIcon>
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\startpage.html" />
+    <Resource Include="Assets\WebView2Loader.dll" />
+    <Resource Include="Assets\nexa_icon.png" />
+    <Resource Include="Assets\nexa.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Resources\WebLLM\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\startpage.html;Assets\nexa_icon.png;Assets\nexa.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

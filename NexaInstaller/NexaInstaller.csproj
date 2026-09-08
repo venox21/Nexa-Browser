@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>NexaSetup</AssemblyName>
+    <RootNamespace>NexaInstaller</RootNamespace>
+    <ApplicationIcon>Assets\nexa.ico</ApplicationIcon>
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\nexa_icon.png" />
+    <Resource Include="Assets\nexa.ico" />
+    <EmbeddedResource Include="Resources\app.zip" />
+  </ItemGroup>
+
+</Project>

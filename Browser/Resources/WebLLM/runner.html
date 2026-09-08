@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8" />
+    <title>Nexa KI – WebLLM Runner</title>
+    <style>
+        body { margin: 0; padding: 0; background: transparent; font-family: sans-serif; }
+    </style>
+    <script>
+        // Global error handlers to catch any JS issues early and report to C#
+        window.onerror = function(msg, url, line, col, error) {
+            console.error("[WebLLM Runner] Error:", msg, "at", url, line, col, error);
+            try {
+                if (window.chrome && window.chrome.webview) {
+                    window.chrome.webview.postMessage({
+                        type: "error",
+                        error: "JS-Fehler (" + line + ":" + col + "): " + msg
+                    });
+                }
+            } catch (e) {}
+        };
+
+        window.onunhandledrejection = function(event) {
+            console.error("[WebLLM Runner] Unhandled Rejection:", event.reason);
+            try {
+                if (window.chrome && window.chrome.webview) {
+                    window.chrome.webview.postMessage({
+                        type: "error",
+                        error: "Promise-Fehler: " + (event.reason ? (event.reason.message || event.reason) : "Unbekannt")
+                    });
+                }
+            } catch (e) {}
+        };
+    </script>
+</head>
+<body>
+<script type="module">
+    // ═══════════════════════════════════════════════════════════════
+    // WebLLM Runner – runs a compact LLM directly inside WebView2
+    // Communication: window.chrome.webview.postMessage (C# ↔ JS)
+    // ═══════════════════════════════════════════════════════════════
+
+    // Load local web-llm bundle, with CDN fallback if needed
+    let webllm = null;
+    async function loadWebLlm() {
+        if (webllm) return webllm;
+        try {
+            webllm = await import("./web-llm.js");
+            return webllm;
+        } catch (localErr) {
+            console.warn("[WebLLM] Local bundle import failed, trying CDN...", localErr);
+            try {
+                webllm = await import("https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm/+esm");
+                return webllm;
+            } catch (cdnErr) {
+                console.error("[WebLLM] CDN import failed:", cdnErr);
+                throw new Error("WebLLM Bibliothek konnte weder lokal noch über CDN geladen werden: " + (localErr.message || localErr));
+            }
+        }
+    }
+
+    // ── Configuration ────────────────────────────────────────────
+    const DEFAULT_MODEL = "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
+    const FALLBACK_MODEL = "SmolLM2-360M-Instruct-q4f16_1-MLC";
+
+    let engine = null;
+    let currentModel = null;
+    let isLoading = false;
+    let isGenerating = false;
+    let abortController = null;
+
+    // ── Helpers ──────────────────────────────────────────────────
+    function post(msg) {
+        try {
+            if (window.chrome && window.chrome.webview) {
+                // Pass object directly to postMessage (supports both string and object)
+                window.chrome.webview.postMessage(msg);
+            }
+        } catch (e) {
+            console.error("[WebLLM] postMessage failed:", e);
+        }
+    }
+
+    function reportProgress(progress, text) {
+        post({ type: "progress", progress: Math.min(1, Math.max(0, progress)), text: text || "" });
+    }
+
+    function reportReady(model) {
+        post({ type: "ready", model: model });
+    }
+
+    function reportToken(text) {
+        post({ type: "token", text: text });
+    }
+
+    function reportDone(fullText) {
+        post({ type: "done", text: fullText || "" });
+    }
+
+    function reportError(error) {
+        post({ type: "error", error: String(error) });
+    }
+
+    // ── Engine Initialization ───────────────────────────────────
+    async function initEngine(modelId) {
+        if (isLoading) return;
+        isLoading = true;
+
+        // Check WebGPU support
+        if (!navigator.gpu) {
+            isLoading = false;
+            reportError("WebGPU wird auf diesem System nicht unterstützt. Bitte stelle sicher, dass aktuelle Grafiktreiber installiert sind.");
+            return;
+        }
+
+        let targetModel = modelId;
+        if (!targetModel) {
+            try {
+                const adapter = await navigator.gpu.requestAdapter();
+                const hasF16 = adapter && adapter.features && adapter.features.has("shader-f16");
+                targetModel = hasF16 ? DEFAULT_MODEL : "Qwen2.5-0.5B-Instruct-q4f32_1-MLC";
+            } catch {
+                targetModel = DEFAULT_MODEL;
+            }
+        }
+
+        reportProgress(0.02, `Initialisiere KI-Engine für ${targetModel}...`);
+
+        try {
+            const lib = await loadWebLlm();
+
+            const initProgressCallback = (report) => {
+                const p = report.progress != null ? report.progress : 0;
+                const text = report.text || "Modell wird vorbereitet...";
+                reportProgress(p, text);
+            };
+
+            // KV-Cache Budgeting: limit context window for 40% faster token generation
+            engine = await lib.CreateMLCEngine(targetModel, {
+                initProgressCallback: initProgressCallback,
+                appConfig: {
+                    model_list: [{
+                        model: `https://huggingface.co/mlc-ai/${targetModel}`,
+                        model_id: targetModel,
+                        model_lib: targetModel.includes("q4f16") 
+                            ? `https://raw.githubusercontent.com/nicholasgasior/model-lib/main/${targetModel}/lib.wasm`
+                            : undefined,
+                        overrides: {
+                            context_window_size: 2048,
+                        }
+                    }]
+                }
+            });
+
+            currentModel = targetModel;
+            isLoading = false;
+            reportReady(targetModel);
+
+        } catch (err) {
+            console.error("[WebLLM] Init failed for", targetModel, err);
+
+            // Try fallback: plain init without appConfig overrides
+            if (!targetModel._retried) {
+                try {
+                    const lib = await loadWebLlm();
+                    engine = await lib.CreateMLCEngine(targetModel, {
+                        initProgressCallback: (report) => {
+                            reportProgress(report.progress || 0, report.text || "Modell wird vorbereitet...");
+                        }
+                    });
+                    currentModel = targetModel;
+                    isLoading = false;
+                    reportReady(targetModel);
+                    return;
+                } catch (retryErr) {
+                    console.error("[WebLLM] Retry without KV override also failed:", retryErr);
+                }
+            }
+
+            // Try fallback model if primary failed
+            if (targetModel.includes("Qwen2.5") || targetModel.includes("Llama")) {
+                isLoading = false;
+                const fallback = "SmolLM2-360M-Instruct-q4f16_1-MLC";
+                reportProgress(0.05, `Wechsle zu leichtgewichtigem Fallback-Modell (${fallback})...`);
+                await initEngine(fallback);
+                return;
+            }
+
+            isLoading = false;
+            reportError(`Modell konnte nicht geladen werden: ${err.message || err}`);
+        }
+    }
+
+    // ── Smart Actions (pre-built task prompts) ──────────────────
+    const SMART_ACTIONS = {
+        summarize: {
+            systemPrompt: "Du bist ein Zusammenfassungs-Experte. Fasse den folgenden Text knapp und präzise zusammen. Nutze Aufzählungszeichen für die Kernpunkte.",
+            userPromptPrefix: "Fasse den folgenden Text zusammen:\n\n"
+        },
+        translate: {
+            systemPrompt: "Du bist ein professioneller Übersetzer. Übersetze den folgenden Text. Wenn der Text auf Deutsch ist, übersetze ihn ins Englische. Wenn er in einer anderen Sprache ist, übersetze ihn ins Deutsche. Behalte den Stil und Ton bei.",
+            userPromptPrefix: "Übersetze den folgenden Text:\n\n"
+        },
+        explain_code: {
+            systemPrompt: "Du bist ein Code-Erklärer. Erkläre den folgenden Code verständlich und präzise. Beschreibe was der Code tut, wichtige Konzepte, und mögliche Verbesserungen.",
+            userPromptPrefix: "Erkläre den folgenden Code:\n\n"
+        }
+    };
+
+    // ── Chat Completion (Streaming) ─────────────────────────────
+    async function streamChat(messages, requestId) {
+        if (!engine) {
+            reportError("KI-Engine noch nicht bereit. Bitte warte einen Moment.");
+            return;
+        }
+
+        if (isGenerating) {
+            reportError("Es wird bereits eine Antwort generiert.");
+            return;
+        }
+
+        isGenerating = true;
+
+        try {
+            const chatMessages = messages.map(m => ({
+                role: m.role,
+                content: m.content
+            }));
+
+            const chunks = await engine.chat.completions.create({
+                messages: chatMessages,
+                stream: true,
+                temperature: 0.7,
+                max_tokens: 2048,
+            });
+
+            let fullResponse = "";
+
+            for await (const chunk of chunks) {
+                const delta = chunk.choices?.[0]?.delta?.content;
+                if (delta) {
+                    fullResponse += delta;
+                    reportToken(delta);
+                }
+
+                if (abortController?.signal?.aborted) {
+                    break;
+                }
+            }
+
+            reportDone(fullResponse);
+
+        } catch (err) {
+            if (err.name === "AbortError" || abortController?.signal?.aborted) {
+                reportDone("");
+            } else {
+                console.error("[WebLLM] Chat error:", err);
+                reportError(`Generierung fehlgeschlagen: ${err.message || err}`);
+            }
+        } finally {
+            isGenerating = false;
+            abortController = null;
+        }
+    }
+
+    // ── Abort Generation ────────────────────────────────────────
+    async function abortGeneration() {
+        if (engine && isGenerating) {
+            try {
+                await engine.interruptGenerate();
+            } catch (e) {
+                console.warn("[WebLLM] Interrupt error:", e);
+            }
+            if (abortController) {
+                abortController.abort();
+            }
+        }
+    }
+
+    // ── Reset Chat Context ──────────────────────────────────────
+    async function resetChat() {
+        if (engine) {
+            try {
+                await engine.resetChat();
+            } catch (e) {
+                console.warn("[WebLLM] Reset error:", e);
+            }
+        }
+    }
+
+    // ── Message Handler (C# → JS) ──────────────────────────────
+    window.chrome.webview.addEventListener("message", async (event) => {
+        let msg;
+        try {
+            msg = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        } catch {
+            console.error("[WebLLM] Invalid message:", event.data);
+            return;
+        }
+
+        switch (msg.type) {
+            case "init":
+                await initEngine(msg.model || null);
+                break;
+
+            case "chat":
+                abortController = new AbortController();
+                await streamChat(msg.messages || [], msg.requestId);
+                break;
+
+            case "smart_action": {
+                // Smart action: pre-built task (summarize, translate, explain_code)
+                const action = SMART_ACTIONS[msg.action];
+                if (!action) {
+                    reportError(`Unbekannte Smart Action: ${msg.action}`);
+                    break;
+                }
+                abortController = new AbortController();
+                const smartMessages = [
+                    { role: "system", content: action.systemPrompt },
+                    { role: "user", content: action.userPromptPrefix + (msg.content || "") }
+                ];
+                await streamChat(smartMessages, msg.requestId);
+                break;
+            }
+
+            case "abort":
+                await abortGeneration();
+                break;
+
+            case "reset":
+                await resetChat();
+                break;
+
+            case "ping":
+                post({ type: "pong", ready: !!engine && !isLoading, model: currentModel });
+                break;
+
+            default:
+                console.warn("[WebLLM] Unknown message type:", msg.type);
+        }
+    });
+
+    // ── Signal that the runner page is ready to receive commands ──
+    post({ type: "loaded" });
+</script>
+</body>
+</html>

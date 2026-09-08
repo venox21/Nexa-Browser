@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neuer Tab</title>
+    <link rel="icon" type="image/png" href="{{LOGO_DATA_URI}}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            background: #080812;
+            color: #e2e8f0;
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 40px 20px;
+            user-select: none;
+        }
+
+        /* Ambient glowing background gradients */
+        .bg-mesh {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            pointer-events: none;
+            background:
+                radial-gradient(ellipse 700px 450px at 25% 20%, rgba(99, 102, 241, 0.12) 0%, transparent 70%),
+                radial-gradient(ellipse 600px 400px at 75% 75%, rgba(139, 92, 246, 0.09) 0%, transparent 70%),
+                radial-gradient(ellipse 900px 600px at 50% 50%, rgba(14, 165, 233, 0.04) 0%, transparent 80%);
+            animation: meshFloat 18s ease-in-out infinite alternate;
+        }
+
+        @keyframes meshFloat {
+            0% { opacity: 0.85; transform: scale(1) translateY(0); }
+            50% { opacity: 1; transform: scale(1.04) translateY(-10px); }
+            100% { opacity: 0.85; transform: scale(1) translateY(0); }
+        }
+
+        /* Subtle grid pattern */
+        .bg-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+            background-size: 48px 48px;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            width: 100%;
+            max-width: 820px;
+            margin: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Top Brand & Logo */
+        .brand-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .logo {
+            width: 46px;
+            height: 46px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.22) 0%, rgba(139, 92, 246, 0.18) 100%);
+            border: 1px solid rgba(139, 92, 246, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow:
+                0 8px 24px rgba(99, 102, 241, 0.3),
+                0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            backdrop-filter: blur(12px);
+            overflow: hidden;
+        }
+
+        .logo:hover {
+            transform: scale(1.08) rotate(3deg);
+            border-color: rgba(139, 92, 246, 0.65);
+            box-shadow:
+                0 12px 28px rgba(99, 102, 241, 0.45),
+                0 0 20px rgba(139, 92, 246, 0.35);
+        }
+
+        .logo-img {
+            width: 34px;
+            height: 34px;
+            object-fit: contain;
+            filter: drop-shadow(0 2px 8px rgba(99, 102, 241, 0.5));
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .logo:hover .logo-img {
+            transform: scale(1.08);
+        }
+
+        .brand-name {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            background: linear-gradient(135deg, #ffffff 40%, #a5b4fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+        }
+
+        .brand-badge {
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: #818cf8;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 20px;
+            padding: 2px 8px;
+            text-transform: uppercase;
+        }
+
+        /* Clock & Date Header */
+        .clock {
+            font-size: 64px;
+            font-weight: 200;
+            color: #f8fafc;
+            line-height: 1.1;
+            letter-spacing: -1px;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+        }
+
+        .greeting-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+            margin-bottom: 34px;
+            font-size: 14px;
+            color: #94a3b8;
+            font-weight: 400;
+            letter-spacing: 0.2px;
+        }
+
+        .greeting-bar .dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: #475569;
+        }
+
+        /* Search bar */
+        .search-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 620px;
+            margin-bottom: 40px;
+        }
+
+        .search-inner {
+            position: relative;
+            display: flex;
+            align-items: center;
+            background: rgba(18, 18, 36, 0.72);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 4px 18px 4px 16px;
+            box-shadow:
+                0 10px 30px rgba(0, 0, 0, 0.45),
+                0 0 0 1px rgba(255, 255, 255, 0.03);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .search-inner:hover {
+            border-color: rgba(99, 102, 241, 0.35);
+            background: rgba(22, 22, 44, 0.85);
+            box-shadow:
+                0 12px 36px rgba(0, 0, 0, 0.55),
+                0 0 20px rgba(99, 102, 241, 0.12);
+        }
+
+        .search-inner:focus-within {
+            border-color: #6366f1;
+            background: rgba(24, 24, 48, 0.95);
+            box-shadow:
+                0 14px 40px rgba(0, 0, 0, 0.6),
+                0 0 0 3px rgba(99, 102, 241, 0.2),
+                0 0 24px rgba(99, 102, 241, 0.25);
+            transform: translateY(-1px);
+        }
+
+        .search-prefix-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 12px;
+            opacity: 0.45;
+            transition: opacity 0.2s;
+            flex-shrink: 0;
+        }
+
+        .search-inner:focus-within .search-prefix-icon {
+            opacity: 0.9;
+            stroke: #818cf8;
+        }
+
+        .search-input {
+            width: 100%;
+            height: 48px;
+            background: transparent;
+            border: none;
+            color: #f1f5f9;
+            font-size: 15px;
+            font-family: inherit;
+            outline: none;
+            user-select: text;
+        }
+
+        .search-input::placeholder {
+            color: #64748b;
+            font-weight: 400;
+        }
+
+        .search-hint {
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            padding: 3px 6px;
+            pointer-events: none;
+            letter-spacing: 0.5px;
+        }
+
+        /* ── Speed Dial Section ── */
+        .speed-dial-section {
+            width: 100%;
+            max-width: 720px;
+        }
+
+        .speed-dial-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
+            gap: 16px;
+            justify-content: center;
+        }
+
+        .tile {
+            position: relative;
+            background: rgba(18, 18, 36, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 16px;
+            padding: 16px 10px 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            backdrop-filter: blur(14px);
+        }
+
+        .tile:hover {
+            transform: translateY(-5px);
+            background: rgba(28, 28, 54, 0.8);
+            border-color: rgba(99, 102, 241, 0.4);
+            box-shadow:
+                0 12px 28px rgba(0, 0, 0, 0.4),
+                0 0 20px rgba(99, 102, 241, 0.15);
+        }
+
+        .tile-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 10px;
+            box-shadow:
+                0 6px 16px rgba(0, 0, 0, 0.3),
+                0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .tile:hover .tile-icon {
+            transform: scale(1.1);
+        }
+
+        .tile-title {
+            font-size: 12px;
+            font-weight: 500;
+            color: #cbd5e1;
+            max-width: 95px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            letter-spacing: 0.2px;
+        }
+
+        .tile-delete {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            font-size: 13px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.2s ease;
+        }
+
+        .tile:hover .tile-delete {
+            opacity: 1;
+        }
+
+        .tile-delete:hover {
+            background: #ef4444;
+            color: white;
+            border-color: #ef4444;
+            transform: scale(1.12);
+        }
+
+        /* Add Tile Button */
+        .tile-add {
+            border: 1px dashed rgba(99, 102, 241, 0.35);
+            background: rgba(18, 18, 36, 0.35);
+        }
+
+        .tile-add:hover {
+            border-color: #6366f1;
+            background: rgba(99, 102, 241, 0.12);
+        }
+
+        .tile-add .tile-icon {
+            background: rgba(99, 102, 241, 0.2);
+            color: #a5b4fc;
+            box-shadow: none;
+            border: 1px dashed rgba(99, 102, 241, 0.4);
+            font-size: 22px;
+            font-weight: 400;
+        }
+
+        /* ── Modal Dialog for adding tile ── */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(8, 8, 18, 0.8);
+            backdrop-filter: blur(12px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal {
+            background: #121224;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 26px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow:
+                0 20px 50px rgba(0, 0, 0, 0.7),
+                0 0 0 1px rgba(255, 255, 255, 0.05);
+            text-align: left;
+            transform: translateY(12px) scale(0.98);
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .modal-overlay.active .modal {
+            transform: translateY(0) scale(1);
+        }
+
+        .modal-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .modal-field {
+            margin-bottom: 16px;
+        }
+
+        .modal-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            color: #94a3b8;
+            margin-bottom: 6px;
+        }
+
+        .modal-input {
+            width: 100%;
+            height: 42px;
+            padding: 0 14px;
+            background: #1a1a32;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: #f8fafc;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .modal-input:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 22px;
+        }
+
+        .btn {
+            padding: 9px 18px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+        }
+
+        .btn-cancel {
+            background: rgba(255, 255, 255, 0.08);
+            color: #cbd5e1;
+        }
+
+        .btn-cancel:hover {
+            background: rgba(255, 255, 255, 0.14);
+            color: white;
+        }
+
+        .btn-save {
+            background: #6366f1;
+            color: white;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-save:hover {
+            background: #4f46e5;
+            transform: translateY(-1px);
+        }
+
+        ::selection {
+            background: rgba(99, 102, 241, 0.35);
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-mesh"></div>
+    <div class="bg-grid"></div>
+
+    <div class="container">
+        <!-- Logo & Brand -->
+        <div class="brand-wrapper">
+            <div class="logo">
+                <img src="{{LOGO_DATA_URI}}" class="logo-img" alt="Nexa" />
+            </div>
+            <div class="brand-name" id="brandName">{{BROWSER_NAME}}</div>
+            <div class="brand-badge">PRO</div>
+        </div>
+
+        <!-- Clock & Date -->
+        <div class="clock" id="clock">00:00</div>
+        <div class="greeting-bar">
+            <span id="greetingText">Guten Tag</span>
+            <span class="dot"></span>
+            <span id="date"></span>
+        </div>
+
+        <!-- Search -->
+        <div class="search-wrapper">
+            <div class="search-inner">
+                <svg class="search-prefix-icon" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="M21 21l-4.35-4.35" stroke-linecap="round" />
+                </svg>
+                <input type="text"
+                       class="search-input"
+                       id="searchInput"
+                       placeholder="Suchen oder Webadresse eingeben..."
+                       autocomplete="off"
+                       spellcheck="false"
+                       autofocus />
+                <span class="search-hint">Enter ↵</span>
+            </div>
+        </div>
+
+        <!-- Speed Dial Section -->
+        <div class="speed-dial-section">
+            <div class="speed-dial-grid" id="speedDialGrid"></div>
+        </div>
+    </div>
+
+    <!-- Modal for adding tile -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <div class="modal-title">⭐ Favorit hinzufügen</div>
+            <div class="modal-field">
+                <label class="modal-label">Name</label>
+                <input type="text" class="modal-input" id="tileNameInput" placeholder="z.B. GitHub" />
+            </div>
+            <div class="modal-field">
+                <label class="modal-label">Webadresse (URL)</label>
+                <input type="text" class="modal-input" id="tileUrlInput" placeholder="https://..." />
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-cancel" id="btnModalCancel">Abbrechen</button>
+                <button type="button" class="btn btn-save" id="btnModalSave">Hinzufügen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Injected Speed Dial Data -->
+    <script id="speedDialData" type="application/json">
+{{SPEED_DIAL_TILES}}
+    </script>
+
+    <script>
+        // ── Clock & Greeting ────────────────────────
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('clock').textContent = `${hours}:${minutes}`;
+
+            const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+            document.getElementById('date').textContent = now.toLocaleDateString('de-DE', options);
+
+            const hour = now.getHours();
+            let greeting = 'Guten Tag';
+            if (hour >= 5 && hour < 12) greeting = '☀️ Guten Morgen';
+            else if (hour >= 12 && hour < 18) greeting = '🌤️ Guten Tag';
+            else if (hour >= 18 && hour < 22) greeting = '🌆 Guten Abend';
+            else greeting = '🌙 Gute Nacht';
+            document.getElementById('greetingText').textContent = greeting;
+        }
+
+        updateClock();
+        setInterval(updateClock, 10000);
+
+        // ── Navigation Helper ───────────────────────
+        function navigateToUrl(url) {
+            if (!url) return;
+            try {
+                if (window.chrome && window.chrome.webview) {
+                    window.chrome.webview.postMessage({
+                        action: 'navigate',
+                        url: url
+                    });
+                    return;
+                }
+            } catch (e) {}
+            window.location.href = url;
+        }
+
+        // ── Search ──────────────────────────────────
+        const searchInput = document.getElementById('searchInput');
+        const SEARCH_URL = '{{SEARCH_URL}}';
+
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                const query = this.value.trim();
+                if (!query) return;
+
+                if (query.match(/^https?:\/\//i) ||
+                    query.match(/^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+/) ||
+                    query.match(/^localhost/i)) {
+                    if (query.match(/^https?:\/\//i)) {
+                        navigateToUrl(query);
+                    } else {
+                        navigateToUrl('https://' + query);
+                    }
+                } else {
+                    navigateToUrl(SEARCH_URL.replace('{0}', encodeURIComponent(query)));
+                }
+            }
+        });
+
+        // ── Speed Dial ──────────────────────────────
+        const DEFAULT_TILES = [
+            { name: 'YouTube', url: 'https://www.youtube.com', color: '#dc2626', icon: '▶' },
+            { name: 'GitHub', url: 'https://github.com', color: '#4f46e5', icon: '⚡' },
+            { name: 'Wikipedia', url: 'https://de.wikipedia.org', color: '#0284c7', icon: 'W' },
+            { name: 'Reddit', url: 'https://www.reddit.com', color: '#ea580c', icon: 'R' },
+            { name: 'ChatGPT', url: 'https://chatgpt.com', color: '#10b981', icon: 'AI' },
+            { name: 'Amazon', url: 'https://www.amazon.de', color: '#d97706', icon: 'A' }
+        ];
+
+        let injectedTiles = [];
+        try {
+            const dataElem = document.getElementById('speedDialData');
+            if (dataElem && dataElem.textContent.trim()) {
+                injectedTiles = JSON.parse(dataElem.textContent.trim());
+            }
+        } catch (e) {
+            injectedTiles = [];
+        }
+
+        let currentTiles = (Array.isArray(injectedTiles) && injectedTiles.length > 0) ? injectedTiles : DEFAULT_TILES;
+
+        function getSavedTiles() {
+            return currentTiles;
+        }
+
+        function saveTiles(tiles) {
+            currentTiles = tiles;
+            // 1. Post to host (C# backend) for persistent disk JSON storage
+            try {
+                if (window.chrome && window.chrome.webview) {
+                    window.chrome.webview.postMessage({
+                        action: 'save_speed_dial',
+                        tiles: tiles
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to postMessage to host:', err);
+            }
+            // 2. LocalStorage fallback
+            try {
+                localStorage.setItem('nexa_speed_dial', JSON.stringify(tiles));
+            } catch (e) {}
+        }
+
+        // Listen for live updates from host (multi-tab sync)
+        if (window.chrome && window.chrome.webview) {
+            window.chrome.webview.addEventListener('message', function(event) {
+                try {
+                    const data = event.data;
+                    if (data && data.action === 'update_speed_dial' && Array.isArray(data.tiles)) {
+                        currentTiles = data.tiles;
+                        renderSpeedDial();
+                    }
+                } catch (e) {}
+            });
+        }
+
+        function getRandomColor(str) {
+            const colors = ['#6366f1', '#7c3aed', '#ec4899', '#f43f5e', '#ef4444', '#f97316', '#eab308', '#10b981', '#06b6d4', '#3b82f6'];
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) hash += str.charCodeAt(i);
+            return colors[Math.abs(hash) % colors.length];
+        }
+
+        function renderSpeedDial() {
+            const grid = document.getElementById('speedDialGrid');
+            grid.innerHTML = '';
+            const tiles = getSavedTiles();
+
+            tiles.forEach((tile, index) => {
+                const item = document.createElement('div');
+                item.className = 'tile';
+                item.innerHTML = `
+                    <button type="button" class="tile-delete" title="Entfernen" data-index="${index}">×</button>
+                    <div class="tile-icon" style="background: ${tile.color || getRandomColor(tile.name)}">
+                        ${tile.icon || (tile.name.substring(0, 2).toUpperCase())}
+                    </div>
+                    <div class="tile-title">${tile.name}</div>
+                `;
+
+                item.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('tile-delete')) {
+                        e.stopPropagation();
+                        const current = getSavedTiles();
+                        current.splice(index, 1);
+                        saveTiles(current);
+                        renderSpeedDial();
+                        return;
+                    }
+                    navigateToUrl(tile.url);
+                });
+
+                grid.appendChild(item);
+            });
+
+            // Add button tile
+            const addBtn = document.createElement('div');
+            addBtn.className = 'tile tile-add';
+            addBtn.innerHTML = `
+                <div class="tile-icon">+</div>
+                <div class="tile-title" style="color:#818cf8;">Hinzufügen</div>
+            `;
+            addBtn.addEventListener('click', () => openModal());
+            grid.appendChild(addBtn);
+        }
+
+        renderSpeedDial();
+
+        // ── Modal Handling ──────────────────────────
+        const modalOverlay = document.getElementById('modalOverlay');
+        const tileNameInput = document.getElementById('tileNameInput');
+        const tileUrlInput = document.getElementById('tileUrlInput');
+
+        function openModal() {
+            tileNameInput.value = '';
+            tileUrlInput.value = 'https://';
+            modalOverlay.classList.add('active');
+            tileNameInput.focus();
+        }
+
+        function closeModal() {
+            modalOverlay.classList.remove('active');
+        }
+
+        document.getElementById('btnModalCancel').addEventListener('click', closeModal);
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) closeModal();
+        });
+
+        document.getElementById('btnModalSave').addEventListener('click', saveNewTile);
+        tileUrlInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') saveNewTile();
+        });
+
+        function saveNewTile() {
+            const name = tileNameInput.value.trim();
+            let url = tileUrlInput.value.trim();
+            if (!name || !url || url === 'https://') return;
+
+            if (!url.match(/^https?:\/\//i)) {
+                url = 'https://' + url;
+            }
+
+            const tiles = getSavedTiles();
+            tiles.push({
+                name: name,
+                url: url,
+                color: getRandomColor(name),
+                icon: name.substring(0, 2).toUpperCase()
+            });
+            saveTiles(tiles);
+            renderSpeedDial();
+            closeModal();
+        }
+
+        // Global key shortcut for search focus
+        document.addEventListener('keydown', function(e) {
+            if (modalOverlay.classList.contains('active')) {
+                if (e.key === 'Escape') closeModal();
+                return;
+            }
+            if (e.target !== searchInput && !e.ctrlKey && !e.altKey && !e.metaKey && e.key.length === 1) {
+                searchInput.focus();
+            }
+        });
+    </script>
+</body>
+</html>
