@@ -1028,6 +1028,7 @@ namespace Browser
                 tab.WebView.CoreWebView2.Settings.AreDevToolsEnabled = SettingsService.Instance.EnableDevTools;
                 tab.WebView.CoreWebView2.Settings.IsPasswordAutosaveEnabled = false;
                 tab.WebView.CoreWebView2.Settings.IsGeneralAutofillEnabled = false;
+                try { tab.WebView.CoreWebView2.Settings.IsReputationCheckingRequired = false; } catch { }
                 tab.WebView.ZoomFactor = SettingsService.Instance.DefaultZoom;
 
                 // Audio playback & mute state tracking
@@ -1295,6 +1296,9 @@ namespace Browser
                 // Download management
                 tab.WebView.CoreWebView2.DownloadStarting += (s, e) =>
                 {
+                    e.Handled = true;
+                    try { tab.WebView.CoreWebView2.CloseDefaultDownloadDialog(); } catch { }
+
                     DownloadManager.Instance.RegisterDownload(e, msg =>
                     {
                         ShowStatus(msg);
