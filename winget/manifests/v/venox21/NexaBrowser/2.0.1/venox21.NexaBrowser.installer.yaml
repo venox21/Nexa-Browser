@@ -1,0 +1,31 @@
+# Created using Generate-WingetManifest.ps1
+PackageIdentifier: venox21.NexaBrowser
+PackageVersion: 2.0.1
+Platform:
+  - Windows.Desktop
+MinimumOSVersion: 10.0.17763.0
+InstallerType: exe
+Scope: user
+InstallModes:
+  - interactive
+  - silent
+InstallerSwitches:
+  Silent: /silent
+  SilentWithProgress: /silent
+  Custom: /s
+UpgradeBehavior: install
+FileExtensions:
+  - html
+  - htm
+  - pdf
+Protocols:
+  - http
+  - https
+  - nexa
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/venox21/Nexa-Browser/releases/download/Installer/NexaSetup.exe
+    InstallerSha256: 3EDA9C8C95970C524A19ABAA7B96D3C3D5224CB702F956E2DA863B7D544CFCAA
+    ProductCode: NexaBrowser
+ManifestType: installer
+ManifestVersion: 1.6.0

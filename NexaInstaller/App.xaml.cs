@@ -1,9 +1,12 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Reflection;
 using System.Windows;
 using Microsoft.Win32;
+using NexaInstaller.Services;
 
 namespace NexaInstaller
 {
@@ -17,14 +20,152 @@ namespace NexaInstaller
             {
                 bool isSilent = e.Args.Any(a => a.Equals("/silent", StringComparison.OrdinalIgnoreCase) ||
                                                 a.Equals("-silent", StringComparison.OrdinalIgnoreCase) ||
-                                                a.Equals("--silent", StringComparison.OrdinalIgnoreCase));
+                                                a.Equals("--silent", StringComparison.OrdinalIgnoreCase) ||
+                                                a.Equals("/s", StringComparison.OrdinalIgnoreCase) ||
+                                                a.Equals("/quiet", StringComparison.OrdinalIgnoreCase) ||
+                                                a.Equals("/qn", StringComparison.OrdinalIgnoreCase));
 
                 PerformUninstall(isSilent);
-                Shutdown();
+                Shutdown(0);
+                return;
+            }
+
+            // Winget / Silent install support
+            if (e.Args.Any(a => a.Equals("/silent", StringComparison.OrdinalIgnoreCase) ||
+                                a.Equals("--silent", StringComparison.OrdinalIgnoreCase) ||
+                                a.Equals("-silent", StringComparison.OrdinalIgnoreCase) ||
+                                a.Equals("/s", StringComparison.OrdinalIgnoreCase) ||
+                                a.Equals("-s", StringComparison.OrdinalIgnoreCase) ||
+                                a.Equals("/quiet", StringComparison.OrdinalIgnoreCase) ||
+                                a.Equals("--quiet", StringComparison.OrdinalIgnoreCase) ||
+                                a.Equals("/qn", StringComparison.OrdinalIgnoreCase) ||
+                                a.Equals("/passive", StringComparison.OrdinalIgnoreCase)))
+            {
+                int exitCode = PerformSilentInstall(e.Args);
+                Shutdown(exitCode);
                 return;
             }
 
             base.OnStartup(e);
+        }
+
+        private static int PerformSilentInstall(string[] args)
+        {
+            try
+            {
+                // Parse custom install path if provided: /dir="..." or /installpath="..." or /D="..."
+                string targetDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Programs",
+                    "Nexa Browser");
+
+                foreach (var arg in args)
+                {
+                    if (arg.StartsWith("/dir=", StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetDir = arg.Substring(5).Trim('\"', '\'');
+                    }
+                    else if (arg.StartsWith("/installpath=", StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetDir = arg.Substring(13).Trim('\"', '\'');
+                    }
+                    else if (arg.StartsWith("/D=", StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetDir = arg.Substring(3).Trim('\"', '\'');
+                    }
+                }
+
+                bool noShortcuts = args.Any(a => a.Equals("/no-shortcuts", StringComparison.OrdinalIgnoreCase) ||
+                                                 a.Equals("--no-shortcuts", StringComparison.OrdinalIgnoreCase) ||
+                                                 a.Equals("/noshortcuts", StringComparison.OrdinalIgnoreCase));
+
+                bool noImport = args.Any(a => a.Equals("/no-import", StringComparison.OrdinalIgnoreCase) ||
+                                             a.Equals("--no-import", StringComparison.OrdinalIgnoreCase) ||
+                                             a.Equals("/noimport", StringComparison.OrdinalIgnoreCase));
+
+                // 1. Close running processes
+                NexaInstaller.MainWindow.CloseRunningNexaProcesses();
+
+                // 2. Extract embedded app.zip
+                Directory.CreateDirectory(targetDir);
+                var assembly = Assembly.GetExecutingAssembly();
+                using (var stream = assembly.GetManifestResourceStream("NexaInstaller.Resources.app.zip"))
+                {
+                    if (stream == null)
+                    {
+                        Console.Error.WriteLine("Error: Embedded resource app.zip not found.");
+                        return 1;
+                    }
+
+                    using var archive = new ZipArchive(stream);
+                    foreach (var entry in archive.Entries)
+                    {
+                        if (string.IsNullOrEmpty(entry.Name)) continue;
+                        var destPath = Path.Combine(targetDir, entry.FullName);
+                        var destDir = Path.GetDirectoryName(destPath);
+                        if (!string.IsNullOrEmpty(destDir))
+                        {
+                            Directory.CreateDirectory(destDir);
+                        }
+                        entry.ExtractToFile(destPath, overwrite: true);
+                    }
+                }
+
+                var installedExePath = Path.Combine(targetDir, "Nexa.exe");
+
+                // 3. Self-copy setup executable for uninstallation
+                try
+                {
+                    var currentExe = Environment.ProcessPath;
+                    if (!string.IsNullOrEmpty(currentExe) && File.Exists(currentExe))
+                    {
+                        var destSetup = Path.Combine(targetDir, "NexaSetup.exe");
+                        File.Copy(currentExe, destSetup, overwrite: true);
+                    }
+                }
+                catch { }
+
+                var iconPath = Path.Combine(targetDir, "Assets", "nexa.ico");
+                if (!File.Exists(iconPath)) iconPath = Path.Combine(targetDir, "nexa.ico");
+
+                // 4. Shortcuts
+                if (!noShortcuts)
+                {
+                    var desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    var lnkDesktop = Path.Combine(desktop, "Nexa Browser.lnk");
+                    NexaInstaller.MainWindow.CreateWindowsShortcut(lnkDesktop, installedExePath, targetDir, iconPath, "Nexa Browser");
+
+                    var startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs");
+                    Directory.CreateDirectory(startMenu);
+                    var lnkStartMenu = Path.Combine(startMenu, "Nexa Browser.lnk");
+                    NexaInstaller.MainWindow.CreateWindowsShortcut(lnkStartMenu, installedExePath, targetDir, iconPath, "Nexa Browser");
+                }
+
+                // 5. Windows Registry
+                NexaInstaller.MainWindow.RegisterInWindowsSystem(targetDir, iconPath, installedExePath);
+                NexaInstaller.MainWindow.RegisterDefaultProtocols(installedExePath);
+
+                // 6. 1-Click Bookmark Import
+                if (!noImport)
+                {
+                    try
+                    {
+                        var bookmarks = BookmarkImporter.DetectExistingBookmarks(out _);
+                        if (bookmarks.Count > 0)
+                        {
+                            BookmarkImporter.ImportToNexa(bookmarks);
+                        }
+                    }
+                    catch { }
+                }
+
+                return 0; // Success
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("Silent install error: " + ex.Message);
+                return 1;
+            }
         }
 
         private static void PerformUninstall(bool isSilent)

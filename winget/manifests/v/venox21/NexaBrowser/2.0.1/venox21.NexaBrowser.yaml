@@ -1,0 +1,6 @@
+# Created using Generate-WingetManifest.ps1
+PackageIdentifier: venox21.NexaBrowser
+PackageVersion: 2.0.1
+DefaultLocale: de-DE
+ManifestType: version
+ManifestVersion: 1.6.0

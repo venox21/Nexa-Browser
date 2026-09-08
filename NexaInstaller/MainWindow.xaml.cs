@@ -1,9 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -11,6 +15,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using Microsoft.Win32;
+using NexaInstaller.Services;
 
 namespace NexaInstaller
 {
@@ -31,8 +36,12 @@ namespace NexaInstaller
         private string _existingVersion = string.Empty;
         private bool _isUninstallMode = false;
 
-        private static readonly Version TargetVersion = new Version(2, 0, 1);
-        private const string TargetVersionDisplay = "2.0.1";
+        internal static readonly Version TargetVersion = new Version(2, 0, 1);
+        internal const string TargetVersionDisplay = "2.0.1";
+
+        private List<ImportedBookmark> _detectedBookmarks = new List<ImportedBookmark>();
+        private string _onlineReleaseUrl = "https://github.com/venox21/Nexa-Browser/releases";
+        private bool _syncingCheckboxes = false;
 
         public MainWindow()
         {
@@ -47,6 +56,8 @@ namespace NexaInstaller
             TxtInstallPath.Text = _targetInstallDir;
 
             CheckForExistingInstallation();
+            _ = ScanForBookmarksAsync();
+            _ = CheckOnlineUpdateAsync();
         }
 
         private void Window_SourceInitialized(object sender, EventArgs e)
@@ -196,6 +207,7 @@ namespace NexaInstaller
 
                 BtnCustomizeUpdate.Visibility = Visibility.Visible;
                 BtnCustomizeUninstall.Visibility = Visibility.Visible;
+                BtnStartInstall.Visibility = Visibility.Collapsed;
             }
             else
             {
@@ -205,6 +217,7 @@ namespace NexaInstaller
 
                 BtnCustomizeUpdate.Visibility = Visibility.Collapsed;
                 BtnCustomizeUninstall.Visibility = Visibility.Collapsed;
+                BtnStartInstall.Visibility = Visibility.Visible;
             }
         }
 
@@ -217,10 +230,123 @@ namespace NexaInstaller
                 bool hasExe = File.Exists(Path.Combine(path, "Nexa.exe"));
                 BtnCustomizeUpdate.Visibility = hasExe ? Visibility.Visible : Visibility.Collapsed;
                 BtnCustomizeUninstall.Visibility = hasExe ? Visibility.Visible : Visibility.Collapsed;
+                BtnStartInstall.Visibility = hasExe ? Visibility.Collapsed : Visibility.Visible;
             }
         }
 
-        private static void CloseRunningNexaProcesses()
+        // ── Bookmark Detection & Import ─────────────────────────────────────
+
+        private async Task ScanForBookmarksAsync()
+        {
+            try
+            {
+                var detected = await Task.Run(() =>
+                {
+                    var items = BookmarkImporter.DetectExistingBookmarks(out var browserNames);
+                    return (items, browserNames);
+                });
+
+                _detectedBookmarks = detected.items;
+
+                if (_detectedBookmarks.Count > 0)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        PanelBookmarkImport.Visibility = Visibility.Visible;
+                        var browsers = string.Join(", ", detected.browserNames);
+                        TxtBookmarkImportTitle.Text = $"⭐ 1-Klick-Import: {_detectedBookmarks.Count} Lesezeichen aus {browsers} übernehmen";
+                        TxtBookmarkImportSubtitle.Text = "Erkannte Lesezeichen werden automatisch sicher in Nexa übertragen.";
+                        ChkImportBookmarks.Content = $"Lesezeichen & Favoriten ({_detectedBookmarks.Count} Stk. aus {browsers}) importieren";
+                        ChkImportBookmarksWelcome.IsChecked = true;
+                        ChkImportBookmarks.IsChecked = true;
+                    });
+                }
+                else
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        PanelBookmarkImport.Visibility = Visibility.Collapsed;
+                        ChkImportBookmarks.IsChecked = false;
+                    });
+                }
+            }
+            catch { }
+        }
+
+        private void ChkImportBookmarks_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_syncingCheckboxes) return;
+            _syncingCheckboxes = true;
+            try
+            {
+                if (sender == ChkImportBookmarksWelcome && ChkImportBookmarks != null)
+                {
+                    ChkImportBookmarks.IsChecked = ChkImportBookmarksWelcome.IsChecked;
+                }
+                else if (sender == ChkImportBookmarks && ChkImportBookmarksWelcome != null)
+                {
+                    ChkImportBookmarksWelcome.IsChecked = ChkImportBookmarks.IsChecked;
+                }
+            }
+            catch { }
+            finally
+            {
+                _syncingCheckboxes = false;
+            }
+        }
+
+        // ── Smart-Update Check ──────────────────────────────────────────────
+
+        private async Task CheckOnlineUpdateAsync()
+        {
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2.5));
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("NexaInstaller/2.0");
+
+                var url = "https://raw.githubusercontent.com/venox21/Nexa-Browser/main/version.json";
+                var json = await client.GetStringAsync(url, cts.Token);
+
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("version", out var verProp))
+                {
+                    var onlineVerStr = verProp.GetString();
+                    if (!string.IsNullOrEmpty(onlineVerStr))
+                    {
+                        var onlineVer = ParseVersionString(onlineVerStr);
+                        if (onlineVer > TargetVersion)
+                        {
+                            Dispatcher.Invoke(() =>
+                            {
+                                BorderOnlineUpdateNotice.Visibility = Visibility.Visible;
+                                TxtOnlineUpdateHeader.Text = $"Neues Setup online verfügbar: v{onlineVerStr}";
+                                TxtOnlineUpdateDetail.Text = $"Auf GitHub gibt es eine neuere Version (Dieses Setup: v{TargetVersionDisplay}).";
+                            });
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Silently ignore if offline or timeout - don't hinder setup
+            }
+        }
+
+        private void BtnOpenOnlineRelease_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = _onlineReleaseUrl,
+                    UseShellExecute = true
+                });
+            }
+            catch { }
+        }
+
+        internal static void CloseRunningNexaProcesses()
         {
             try
             {
@@ -438,6 +564,21 @@ namespace NexaInstaller
                 CreateWindowsShortcut(lnkPath, _installedExePath, _targetInstallDir, iconPath, "Nexa Browser");
             }
 
+            // Bookmark Import (if selected)
+            if (ChkImportBookmarks.IsChecked == true && _detectedBookmarks.Count > 0)
+            {
+                SetProgress(94, "Lesezeichen importieren...", "Übertrage Favoriten in Nexa Browser...");
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        BookmarkImporter.ImportToNexa(_detectedBookmarks);
+                    }
+                    catch { }
+                });
+                await Task.Delay(100);
+            }
+
             SetProgress(96, "Windows 11 Registrierung...", "Aktualisiere Registry & Systemintegration...");
             await Task.Delay(150);
             RegisterInWindowsSystem(_targetInstallDir, iconPath, _installedExePath);
@@ -450,8 +591,8 @@ namespace NexaInstaller
             SetProgress(100, "Aktualisierung erfolgreich abgeschlossen!", "Fertiggestellt");
             await Task.Delay(350);
 
-            TxtFinishTitle.Text = "Aktualisierung auf Version 2.0 erfolgreich!";
-            TxtFinishSubtitle.Text = "Nexa Browser wurde erfolgreich auf Version 2.0 aktualisiert.";
+            TxtFinishTitle.Text = $"Aktualisierung auf Version {TargetVersionDisplay} erfolgreich!";
+            TxtFinishSubtitle.Text = $"Nexa Browser wurde erfolgreich auf Version {TargetVersionDisplay} aktualisiert.";
             TxtFinishIcon.Text = "✓";
             BorderFinishIcon.Background = new SolidColorBrush(Color.FromRgb(0x0D, 0x2E, 0x24));
             BorderFinishIcon.BorderBrush = new SolidColorBrush(Color.FromRgb(0x10, 0xB9, 0x81));
@@ -749,7 +890,22 @@ namespace NexaInstaller
                 CreateWindowsShortcut(lnkPath, _installedExePath, _targetInstallDir, iconPath, "Nexa Browser");
             }
 
-            // 5. Register in Windows 11 Apps & Features + Standard Browser
+            // 5. Bookmark Import (if selected)
+            if (ChkImportBookmarks.IsChecked == true && _detectedBookmarks.Count > 0)
+            {
+                SetProgress(94, "Lesezeichen importieren...", "Übertrage bestehende Favoriten in Nexa Browser...");
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        BookmarkImporter.ImportToNexa(_detectedBookmarks);
+                    }
+                    catch { }
+                });
+                await Task.Delay(100);
+            }
+
+            // 6. Register in Windows 11 Apps & Features + Standard Browser
             SetProgress(96, "Windows 11 Registrierung...", "Registriere Browser & Protokolle...");
             await Task.Delay(150);
 
@@ -763,8 +919,8 @@ namespace NexaInstaller
             SetProgress(100, "Installation erfolgreich abgeschlossen!", "Fertiggestellt");
             await Task.Delay(350);
 
-            TxtFinishTitle.Text = "Installation erfolgreich!";
-            TxtFinishSubtitle.Text = "Nexa Browser wurde erfolgreich auf deinem Windows 11 PC eingerichtet.";
+            TxtFinishTitle.Text = $"Installation erfolgreich!";
+            TxtFinishSubtitle.Text = $"Nexa Browser v{TargetVersionDisplay} wurde erfolgreich auf deinem Windows 11 PC eingerichtet.";
             TxtFinishIcon.Text = "✓";
             BorderFinishIcon.Background = new SolidColorBrush(Color.FromRgb(0x0D, 0x2E, 0x24));
             BorderFinishIcon.BorderBrush = new SolidColorBrush(Color.FromRgb(0x10, 0xB9, 0x81));
@@ -804,7 +960,7 @@ namespace NexaInstaller
 
         // ── Native Windows Integration ───────────────────────────────────
 
-        private static void CreateWindowsShortcut(string shortcutPath, string targetPath, string workingDir, string iconPath, string description)
+        internal static void CreateWindowsShortcut(string shortcutPath, string targetPath, string workingDir, string iconPath, string description)
         {
             try
             {
@@ -829,7 +985,7 @@ namespace NexaInstaller
             catch { }
         }
 
-        private static void RegisterInWindowsSystem(string installDir, string iconPath, string exePath)
+        internal static void RegisterInWindowsSystem(string installDir, string iconPath, string exePath)
         {
             try
             {
@@ -840,7 +996,7 @@ namespace NexaInstaller
                     {
                         var uninstallerPath = Path.Combine(installDir, "NexaSetup.exe");
                         key.SetValue("DisplayName", "Nexa Browser");
-                        key.SetValue("DisplayVersion", "2.0.0");
+                        key.SetValue("DisplayVersion", TargetVersionDisplay);
                         key.SetValue("Publisher", "Nexa");
                         key.SetValue("InstallLocation", installDir);
                         key.SetValue("UninstallString", $"\"{uninstallerPath}\" /uninstall");
@@ -932,7 +1088,7 @@ namespace NexaInstaller
             catch { }
         }
 
-        private static void RegisterDefaultProtocols(string exePath)
+        internal static void RegisterDefaultProtocols(string exePath)
         {
             try
             {

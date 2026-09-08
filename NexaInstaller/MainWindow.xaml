@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Nexa Browser Setup"
-        Height="600" Width="530"
+        Height="650" Width="630"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -245,25 +245,25 @@
 
                     <StackPanel Grid.Row="0" VerticalAlignment="Center">
                         <!-- Hero Logo with radial glow -->
-                        <Border Width="76" Height="76"
-                                CornerRadius="22"
+                        <Border Width="72" Height="72"
+                                CornerRadius="20"
                                 Background="#14172E"
                                 BorderBrush="#4338CA"
                                 BorderThickness="1.5"
                                 HorizontalAlignment="Center"
-                                Margin="0,0,0,10">
+                                Margin="0,0,0,8">
                             <Border.Effect>
-                                <DropShadowEffect BlurRadius="28" Color="#6366F1" Opacity="0.5" ShadowDepth="0" />
+                                <DropShadowEffect BlurRadius="26" Color="#6366F1" Opacity="0.5" ShadowDepth="0" />
                             </Border.Effect>
                             <Image Source="pack://application:,,,/Assets/nexa_icon.png"
-                                   Width="50" Height="50"
+                                   Width="46" Height="46"
                                    RenderOptions.BitmapScalingMode="HighQuality"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center" />
                         </Border>
 
                         <TextBlock Text="Nexa Browser"
-                                   FontSize="24"
+                                   FontSize="23"
                                    FontWeight="Bold"
                                    Foreground="#F8FAFC"
                                    HorizontalAlignment="Center" />
@@ -273,20 +273,57 @@
                                    Foreground="#94A3B8"
                                    HorizontalAlignment="Center"
                                    TextAlignment="Center"
-                                   Margin="0,3,0,10" />
+                                   Margin="0,2,0,8" />
 
                         <!-- Version badge -->
                         <Border Background="#1C1B3A"
                                 BorderBrush="#3B3878"
                                 BorderThickness="1"
                                 CornerRadius="12"
-                                Padding="12,4"
+                                Padding="12,3"
                                 HorizontalAlignment="Center"
-                                Margin="0,0,0,12">
-                            <TextBlock Text="v2.0 • 64-Bit Edition"
+                                Margin="0,0,0,10">
+                            <TextBlock Text="v2.0.1 • 64-Bit Edition"
                                        FontSize="11"
                                        FontWeight="Medium"
                                        Foreground="#A5B4FC" />
+                        </Border>
+
+                        <!-- Online Update Notice (Smart-Update check on startup) -->
+                        <Border x:Name="BorderOnlineUpdateNotice"
+                                Background="#1A1838"
+                                BorderBrush="#818CF8"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Padding="12,8"
+                                Margin="4,0,4,8"
+                                Visibility="Collapsed">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="16" Color="#6366F1" Opacity="0.3" ShadowDepth="0" />
+                            </Border.Effect>
+                            <DockPanel LastChildFill="True">
+                                <Button x:Name="BtnOpenOnlineRelease"
+                                        DockPanel.Dock="Right"
+                                        Click="BtnOpenOnlineRelease_Click"
+                                        Content="Herunterladen ➜"
+                                        Style="{StaticResource Win11PrimaryButtonStyle}"
+                                        Height="28"
+                                        Padding="10,0"
+                                        FontSize="11"
+                                        Margin="8,0,0,0" />
+                                <TextBlock Text="🌐" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock x:Name="TxtOnlineUpdateHeader"
+                                               Text="Neues Setup online verfügbar!"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="#E0E7FF" />
+                                    <TextBlock x:Name="TxtOnlineUpdateDetail"
+                                               Text="Eine neuere Version ist auf GitHub verfügbar."
+                                               FontSize="10"
+                                               Foreground="#A5B4FC" />
+                                </StackPanel>
+                            </DockPanel>
                         </Border>
 
                         <!-- Existing installation detected banner -->
@@ -295,8 +332,8 @@
                                 BorderBrush="#4F46E5"
                                 BorderThickness="1"
                                 CornerRadius="10"
-                                Padding="12,9"
-                                Margin="4,0,4,10"
+                                Padding="12,8"
+                                Margin="4,0,4,8"
                                 Visibility="Collapsed">
                             <Border.Effect>
                                 <DropShadowEffect x:Name="ShadowExistingInstall" BlurRadius="16" Color="#4F46E5" Opacity="0.3" ShadowDepth="0" />
@@ -310,12 +347,12 @@
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <DockPanel>
                                         <TextBlock x:Name="TxtDetectedHeader"
-                                                   Text="Update auf Version 2.0 verfügbar"
+                                                   Text="Update auf Version 2.0.1 verfügbar"
                                                    FontSize="12"
                                                    FontWeight="SemiBold"
                                                    Foreground="#F1F5F9" />
                                         <TextBlock x:Name="TxtDetectedVersion"
-                                                   Text="v1.0 ➜ v2.0"
+                                                   Text="v1.0 ➜ v2.0.1"
                                                    FontSize="11"
                                                    Foreground="#A5B4FC"
                                                    HorizontalAlignment="Right" />
@@ -330,6 +367,41 @@
                             </Grid>
                         </Border>
 
+                        <!-- 1-Klick-Import aus bestehenden Browsern (Chrome, Edge, Brave) -->
+                        <Border x:Name="PanelBookmarkImport"
+                                Background="#0D1A2D"
+                                BorderBrush="#0284C7"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Padding="12,8"
+                                Margin="4,0,4,8"
+                                Visibility="Collapsed">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="14" Color="#0284C7" Opacity="0.25" ShadowDepth="0" />
+                            </Border.Effect>
+                            <DockPanel>
+                                <TextBlock Text="⭐" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0" DockPanel.Dock="Left" />
+                                <CheckBox x:Name="ChkImportBookmarksWelcome"
+                                          IsChecked="True"
+                                          Style="{StaticResource Win11CheckBoxStyle}"
+                                          VerticalAlignment="Center"
+                                          Checked="ChkImportBookmarks_Changed"
+                                          Unchecked="ChkImportBookmarks_Changed">
+                                    <StackPanel Margin="2,0,0,0">
+                                        <TextBlock x:Name="TxtBookmarkImportTitle"
+                                                   Text="1-Klick-Import: Lesezeichen aus Chrome, Edge &amp; Brave übernehmen"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#F1F5F9" />
+                                        <TextBlock x:Name="TxtBookmarkImportSubtitle"
+                                                   Text="Gefundene Lesezeichen werden automatisch sicher in Nexa übertragen."
+                                                   FontSize="10"
+                                                   Foreground="#7DD3FC" />
+                                    </StackPanel>
+                                </CheckBox>
+                            </DockPanel>
+                        </Border>
+
                         <!-- Feature Highlights -->
                         <StackPanel Margin="4,0,4,0">
                             <!-- Feature 1 -->
@@ -337,13 +409,13 @@
                                     BorderBrush="#202444"
                                     BorderThickness="1"
                                     CornerRadius="10"
-                                    Padding="12,7"
-                                    Margin="0,0,0,6">
+                                    Padding="12,6"
+                                    Margin="0,0,0,5">
                                 <DockPanel>
-                                    <TextBlock Text="🛡️" FontSize="15" DockPanel.Dock="Left" Margin="0,0,10,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="🛡️" FontSize="14" DockPanel.Dock="Left" Margin="0,0,10,0" VerticalAlignment="Center" />
                                     <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="Integrierter AdBlocker &amp; YouTube Shield" FontSize="12" FontWeight="SemiBold" Foreground="#F1F5F9" />
-                                        <TextBlock Text="Blockiert Werbung, Popups und Tracking nativ ohne Plug-ins." FontSize="11" Foreground="#64748B" />
+                                        <TextBlock Text="Integrierter AdBlocker &amp; YouTube Shield" FontSize="11" FontWeight="SemiBold" Foreground="#F1F5F9" />
+                                        <TextBlock Text="Blockiert Werbung, Popups und Tracking nativ ohne Plug-ins." FontSize="10" Foreground="#64748B" />
                                     </StackPanel>
                                 </DockPanel>
                             </Border>
@@ -353,13 +425,13 @@
                                     BorderBrush="#202444"
                                     BorderThickness="1"
                                     CornerRadius="10"
-                                    Padding="12,7"
-                                    Margin="0,0,0,6">
+                                    Padding="12,6"
+                                    Margin="0,0,0,5">
                                 <DockPanel>
-                                    <TextBlock Text="✨" FontSize="15" DockPanel.Dock="Left" Margin="0,0,10,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="✨" FontSize="14" DockPanel.Dock="Left" Margin="0,0,10,0" VerticalAlignment="Center" />
                                     <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="Nexa KI-Assistent &amp; Seitenanalyse" FontSize="12" FontWeight="SemiBold" Foreground="#F1F5F9" />
-                                        <TextBlock Text="Webseiten zusammenfassen, Fragen stellen &amp; lokale KI nutzen." FontSize="11" Foreground="#64748B" />
+                                        <TextBlock Text="Nexa KI-Assistent &amp; Seitenanalyse" FontSize="11" FontWeight="SemiBold" Foreground="#F1F5F9" />
+                                        <TextBlock Text="Webseiten zusammenfassen, Fragen stellen &amp; lokale KI nutzen." FontSize="10" Foreground="#64748B" />
                                     </StackPanel>
                                 </DockPanel>
                             </Border>
@@ -369,72 +441,100 @@
                                     BorderBrush="#202444"
                                     BorderThickness="1"
                                     CornerRadius="10"
-                                    Padding="12,7">
+                                    Padding="12,6">
                                 <DockPanel>
-                                    <TextBlock Text="⚡" FontSize="15" DockPanel.Dock="Left" Margin="0,0,10,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="⚡" FontSize="14" DockPanel.Dock="Left" Margin="0,0,10,0" VerticalAlignment="Center" />
                                     <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="Turbo-DNS, Instant-Cache &amp; Spotlight" FontSize="12" FontWeight="SemiBold" Foreground="#F1F5F9" />
-                                        <TextBlock Text="Paralleles DNS-Prewarming, BackForwardCache &amp; Instant-Ladezeiten." FontSize="11" Foreground="#64748B" />
+                                        <TextBlock Text="Turbo-DNS, Instant-Cache &amp; Spotlight" FontSize="11" FontWeight="SemiBold" Foreground="#F1F5F9" />
+                                        <TextBlock Text="Paralleles DNS-Prewarming, BackForwardCache &amp; Instant-Ladezeiten." FontSize="10" Foreground="#64748B" />
                                     </StackPanel>
                                 </DockPanel>
                             </Border>
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- Bottom Buttons -->
-                    <Grid Grid.Row="1" Margin="0,16,0,0">
+                    <!-- Bottom Action Areas (Generously spaced 2-tier design, no cramped buttons!) -->
+                    <Grid Grid.Row="1" Margin="0,14,0,0">
                         <!-- State A: Existing Installation Detected -->
-                        <DockPanel x:Name="PanelActionsExisting" Visibility="Collapsed">
-                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                                <Button x:Name="BtnWelcomeUninstall"
-                                        Click="BtnUninstall_Click"
-                                        Content="🗑️ Deinstallieren"
-                                        Style="{StaticResource Win11DangerButtonStyle}"
-                                        Margin="0,0,8,0"
-                                        ToolTip="Löscht die vorhandene Version von Nexa Browser vom Computer" />
-                                <Button x:Name="BtnWelcomeReinstall"
-                                        Click="BtnWelcomeLaunchOrReinstall_Click"
-                                        Content="🚀 Browser starten"
-                                        Style="{StaticResource Win11SecondaryButtonStyle}"
-                                        Margin="0,0,8,0"
-                                        Visibility="Visible"
-                                        ToolTip="Startet den installierten Nexa Browser" />
-                                <Button x:Name="BtnGoCustomize"
-                                        Click="BtnGoCustomize_Click"
-                                        Content="⚙️ Anpassen"
-                                        Style="{StaticResource Win11SecondaryButtonStyle}"
-                                        ToolTip="Installationsoptionen und Pfad ändern" />
-                            </StackPanel>
+                        <StackPanel x:Name="PanelActionsExisting" Visibility="Collapsed">
+                            <!-- Tier 1: Primary Update / Reinstall Action -->
                             <Button x:Name="BtnWelcomeUpdate"
                                     Click="BtnWelcomeUpdate_Click"
-                                    Content="🔄 Auf Version 2.0 aktualisieren"
+                                    Content="🔄 Jetzt auf Version 2.0.1 aktualisieren"
                                     Style="{StaticResource Win11PrimaryButtonStyle}"
-                                    HorizontalAlignment="Right"
-                                    MinWidth="180"
-                                    ToolTip="Überschreibt die alte Version und aktualisiert auf Version 2.0" />
-                        </DockPanel>
+                                    Height="44"
+                                    FontSize="13"
+                                    HorizontalAlignment="Stretch"
+                                    Margin="0,0,0,10"
+                                    ToolTip="Überschreibt alle Dateien und bringt die Installation auf die neueste Version" />
 
-                        <!-- State B: Clean / New Installation -->
-                        <DockPanel x:Name="PanelActionsNew" Visibility="Visible">
-                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                                <Button x:Name="BtnGoCustomizeNew"
-                                        Click="BtnGoCustomize_Click"
-                                        Content="⚙️ Anpassen"
-                                        Style="{StaticResource Win11SecondaryButtonStyle}"
-                                        Margin="0,0,8,0" />
-                                <Button x:Name="BtnWelcomeUninstallNew"
+                            <!-- Tier 2: Secondary Utilities (Spaced neatly across the width) -->
+                            <DockPanel LastChildFill="False">
+                                <Button x:Name="BtnWelcomeUninstall"
+                                        DockPanel.Dock="Left"
                                         Click="BtnUninstall_Click"
                                         Content="🗑️ Deinstallieren"
                                         Style="{StaticResource Win11DangerButtonStyle}"
-                                        ToolTip="Vorhandene Version deinstallieren" />
-                            </StackPanel>
+                                        Height="36"
+                                        Padding="16,0"
+                                        ToolTip="Löscht die vorhandene Version von Nexa Browser vom Computer" />
+
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                    <Button x:Name="BtnGoCustomize"
+                                            Click="BtnGoCustomize_Click"
+                                            Content="⚙️ Anpassen..."
+                                            Style="{StaticResource Win11SecondaryButtonStyle}"
+                                            Height="36"
+                                            Padding="14,0"
+                                            Margin="0,0,8,0"
+                                            ToolTip="Installationsoptionen und Pfad ändern" />
+                                    <Button x:Name="BtnWelcomeReinstall"
+                                            Click="BtnWelcomeLaunchOrReinstall_Click"
+                                            Content="🚀 Browser starten"
+                                            Style="{StaticResource Win11SecondaryButtonStyle}"
+                                            Height="36"
+                                            Padding="16,0"
+                                            Visibility="Visible"
+                                            ToolTip="Startet den installierten Nexa Browser" />
+                                </StackPanel>
+                            </DockPanel>
+                        </StackPanel>
+
+                        <!-- State B: Clean / New Installation -->
+                        <StackPanel x:Name="PanelActionsNew" Visibility="Visible">
+                            <!-- Tier 1: Primary Express Install Action -->
                             <Button x:Name="BtnExpressInstall"
                                     Click="BtnExpressInstall_Click"
-                                    Content="Jetzt installieren (v2.0)"
+                                    Content="⚡ Jetzt installieren (v2.0.1)"
                                     Style="{StaticResource Win11PrimaryButtonStyle}"
-                                    HorizontalAlignment="Right"
-                                    MinWidth="170" />
-                        </DockPanel>
+                                    Height="44"
+                                    FontSize="13"
+                                    HorizontalAlignment="Stretch"
+                                    Margin="0,0,0,10"
+                                    ToolTip="Installiert Nexa Browser mit den empfohlenen Standardeinstellungen" />
+
+                            <!-- Tier 2: Secondary Actions -->
+                            <DockPanel LastChildFill="False">
+                                <Button x:Name="BtnWelcomeUninstallNew"
+                                        DockPanel.Dock="Left"
+                                        Click="BtnUninstall_Click"
+                                        Content="🗑️ Deinstallieren"
+                                        Style="{StaticResource Win11DangerButtonStyle}"
+                                        Height="36"
+                                        Padding="16,0"
+                                        Visibility="Collapsed"
+                                        ToolTip="Vorhandene Version deinstallieren" />
+
+                                <Button x:Name="BtnGoCustomizeNew"
+                                        DockPanel.Dock="Right"
+                                        Click="BtnGoCustomize_Click"
+                                        Content="⚙️ Benutzerdefiniert anpassen..."
+                                        Style="{StaticResource Win11SecondaryButtonStyle}"
+                                        Height="36"
+                                        Padding="16,0"
+                                        ToolTip="Installationspfad und Verknüpfungen konfigurieren" />
+                            </DockPanel>
+                        </StackPanel>
                     </Grid>
                 </Grid>
 
@@ -535,6 +635,13 @@
                                           IsChecked="True"
                                           Style="{StaticResource Win11CheckBoxStyle}" />
 
+                                <CheckBox x:Name="ChkImportBookmarks"
+                                          Content="Lesezeichen &amp; Favoriten aus anderen Browsern (Chrome, Edge, Brave) importieren"
+                                          IsChecked="True"
+                                          Style="{StaticResource Win11CheckBoxStyle}"
+                                          Checked="ChkImportBookmarks_Changed"
+                                          Unchecked="ChkImportBookmarks_Changed" />
+
                                 <CheckBox x:Name="ChkLaunchAfterInstall"
                                           Content="Nexa Browser nach Abschluss sofort starten"
                                           IsChecked="True"
@@ -544,33 +651,38 @@
                     </StackPanel>
 
                     <!-- Bottom Buttons -->
-                    <DockPanel Grid.Row="2" Margin="0,16,0,0">
-                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                            <Button x:Name="BtnBackToWelcome"
-                                    Click="BtnBackToWelcome_Click"
-                                    Content="&lt; Zurück"
-                                    Style="{StaticResource Win11SecondaryButtonStyle}"
-                                    Margin="0,0,8,0" />
+                    <DockPanel Grid.Row="2" Margin="0,16,0,0" LastChildFill="False">
+                        <Button x:Name="BtnBackToWelcome"
+                                DockPanel.Dock="Left"
+                                Click="BtnBackToWelcome_Click"
+                                Content="&lt; Zurück"
+                                Style="{StaticResource Win11SecondaryButtonStyle}"
+                                Height="40"
+                                Padding="16,0" />
+
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                             <Button x:Name="BtnCustomizeUninstall"
                                     Click="BtnUninstall_Click"
                                     Content="🗑️ Deinstallieren"
                                     Style="{StaticResource Win11DangerButtonStyle}"
+                                    Height="40"
+                                    Padding="14,0"
+                                    Margin="0,0,10,0"
                                     ToolTip="Vorhandene Version aus diesem Verzeichnis deinstallieren" />
-                        </StackPanel>
-
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button x:Name="BtnCustomizeUpdate"
                                     Click="BtnUpdate_Click"
                                     Content="🔄 Aktualisieren"
                                     Style="{StaticResource Win11PrimaryButtonStyle}"
-                                    Margin="0,0,8,0"
-                                    MinWidth="135"
+                                    Height="40"
+                                    Padding="18,0"
+                                    Margin="0,0,10,0"
                                     ToolTip="Überschreibt die vorhandenen Dateien mit der neuen Version" />
                             <Button x:Name="BtnStartInstall"
                                     Click="BtnStartInstall_Click"
                                     Content="Installation starten"
-                                    Style="{StaticResource Win11SecondaryButtonStyle}"
-                                    MinWidth="145" />
+                                    Style="{StaticResource Win11PrimaryButtonStyle}"
+                                    Height="40"
+                                    Padding="18,0" />
                         </StackPanel>
                     </DockPanel>
                 </Grid>
