@@ -874,7 +874,7 @@ namespace NexaInstaller
                         iconKey?.SetValue("", $"{exePath},0");
 
                         using var shellKey = smiKey.CreateSubKey(@"shell\open\command");
-                        shellKey?.SetValue("", $"\"{exePath}\"");
+                        shellKey?.SetValue("", $"\"{exePath}\" \"%1\"");
 
                         // Capabilities
                         using var capKey = smiKey.CreateSubKey("Capabilities");

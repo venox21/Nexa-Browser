@@ -1,6 +1,10 @@
 using System;
 using System.IO;
+using System.IO.Pipes;
 using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using Browser.Services;
 
@@ -10,6 +14,13 @@ namespace Browser
     {
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern bool SetDllDirectory(string lpPathName);
+
+        private static Mutex? _instanceMutex;
+        private static CancellationTokenSource? _pipeCts;
+        private const string MutexName = "NexaBrowser_SingleInstance_Mutex_Fabian";
+        private const string PipeName = "NexaBrowser_SingleInstance_Pipe_Fabian";
+
+        public static string? InitialCommandLineUrl { get; private set; }
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -25,6 +36,25 @@ namespace Browser
                 }
                 catch { }
             };
+
+            // 1. Single-Instance & URL check
+            var requestedUrl = ExtractUrlFromArgs(e.Args) ?? ExtractUrlFromArgs(Environment.GetCommandLineArgs());
+
+            bool isFirstInstance;
+            _instanceMutex = new Mutex(true, MutexName, out isFirstInstance);
+
+            if (!isFirstInstance)
+            {
+                // Another instance is already running: forward URL and exit immediately
+                SendUrlToRunningInstance(requestedUrl ?? "ACTIVATE");
+                Environment.Exit(0);
+                return;
+            }
+
+            InitialCommandLineUrl = requestedUrl;
+
+            // Start background pipe listener for external URLs opened while running
+            StartNamedPipeListener();
 
             EnsureWebView2Loader();
             base.OnStartup(e);
@@ -42,6 +72,129 @@ namespace Browser
             });
 
             ThemeService.Instance.ApplySavedTheme();
+        }
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            _pipeCts?.Cancel();
+            try { _instanceMutex?.ReleaseMutex(); } catch { }
+            _instanceMutex?.Dispose();
+            base.OnExit(e);
+        }
+
+        private static void StartNamedPipeListener()
+        {
+            _pipeCts = new CancellationTokenSource();
+            var token = _pipeCts.Token;
+
+            Task.Run(async () =>
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    try
+                    {
+                        using var server = new NamedPipeServerStream(
+                            PipeName,
+                            PipeDirection.In,
+                            1,
+                            PipeTransmissionMode.Byte,
+                            PipeOptions.Asynchronous);
+
+                        await server.WaitForConnectionAsync(token);
+
+                        using var reader = new StreamReader(server, Encoding.UTF8);
+                        var message = await reader.ReadLineAsync(token);
+
+                        if (!string.IsNullOrWhiteSpace(message))
+                        {
+                            var trimmed = message.Trim();
+                            Current?.Dispatcher?.Invoke(() =>
+                            {
+                                if (Current.MainWindow is MainWindow mw)
+                                {
+                                    mw.HandleExternalUrl(trimmed);
+                                }
+                            });
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                    catch
+                    {
+                        await Task.Delay(200, token);
+                    }
+                }
+            }, token);
+        }
+
+        private static void SendUrlToRunningInstance(string message)
+        {
+            try
+            {
+                using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
+                client.Connect(1200);
+
+                using var writer = new StreamWriter(client, Encoding.UTF8);
+                writer.WriteLine(message);
+                writer.Flush();
+            }
+            catch { }
+        }
+
+        public static string? ExtractUrlFromArgs(string[]? args)
+        {
+            if (args == null || args.Length == 0) return null;
+
+            foreach (var rawArg in args)
+            {
+                if (string.IsNullOrWhiteSpace(rawArg)) continue;
+                var arg = rawArg.Trim('"', '\'', ' ');
+
+                // Ignore executable name itself
+                if (arg.EndsWith("Nexa.exe", StringComparison.OrdinalIgnoreCase) ||
+                    arg.EndsWith("Nexa.dll", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                // Ignore flags
+                if (arg.StartsWith("-") || arg.StartsWith("/"))
+                {
+                    continue;
+                }
+
+                // Check local file
+                if (File.Exists(arg))
+                {
+                    try
+                    {
+                        return new Uri(Path.GetFullPath(arg)).AbsoluteUri;
+                    }
+                    catch { }
+                }
+
+                // Check URI
+                if (Uri.TryCreate(arg, UriKind.Absolute, out var uri))
+                {
+                    if (uri.Scheme == Uri.UriSchemeHttp ||
+                        uri.Scheme == Uri.UriSchemeHttps ||
+                        uri.Scheme == Uri.UriSchemeFile ||
+                        uri.Scheme.Equals("nexa", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return arg;
+                    }
+                }
+
+                // Domain without protocol
+                if (arg.Contains(".") && !arg.Contains(" ") && !arg.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "https://" + arg;
+                }
+            }
+
+            return null;
         }
 
         private static void EnsureWebView2Loader()

@@ -1,6 +1,7 @@
 # .NET build output
 **/bin/
 **/obj/
+*_wpftmp.csproj
 
 # Nexa build artifacts
 publish/

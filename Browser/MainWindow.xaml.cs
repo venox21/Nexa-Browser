@@ -90,7 +90,16 @@ namespace Browser
 
             // 2. Open tab immediately (visible to user first – fastest perceived startup)
             bool tabCreated = false;
-            if (!_isIncognito)
+
+            // Priority: URL passed from command line / clicked external link
+            var initialUrl = App.InitialCommandLineUrl;
+            if (!string.IsNullOrWhiteSpace(initialUrl) && !initialUrl.Equals("ACTIVATE", StringComparison.OrdinalIgnoreCase))
+            {
+                _tabManager.AddTab(initialUrl);
+                tabCreated = true;
+            }
+
+            if (!tabCreated && !_isIncognito)
             {
                 var settings = SettingsService.Instance.Settings;
                 if (settings.StartupMode == 1 || settings.RestoreTabsOnStartup)
@@ -131,6 +140,48 @@ namespace Browser
                     await GoogleSyncService.Instance.SynchronizeAsync(false);
                 });
             }
+        }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        private const int SW_RESTORE = 9;
+
+        /// <summary>
+        /// Handles URLs opened externally from other Windows applications while the browser is running.
+        /// </summary>
+        public void HandleExternalUrl(string url)
+        {
+            BringToFront();
+
+            if (!string.IsNullOrWhiteSpace(url) && !url.Equals("ACTIVATE", StringComparison.OrdinalIgnoreCase))
+            {
+                _tabManager.AddTab(url);
+            }
+        }
+
+        public void BringToFront()
+        {
+            var handle = new WindowInteropHelper(this).Handle;
+            if (handle != IntPtr.Zero)
+            {
+                ShowWindow(handle, SW_RESTORE);
+                SetForegroundWindow(handle);
+            }
+
+            if (WindowState == WindowState.Minimized)
+            {
+                WindowState = WindowState.Normal;
+            }
+
+            Activate();
+            Topmost = true;
+            Topmost = false;
+            Focus();
         }
 
         private void OnThemeChanged(ColorTheme theme)
