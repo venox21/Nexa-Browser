@@ -1519,46 +1519,209 @@
             <Border Grid.Row="2"
                     x:Name="BookmarksBar"
                     Background="{StaticResource BgDeepBrush}"
-                    Height="28"
-                    Padding="10,0"
+                    Height="34"
+                    Padding="8,0"
                     BorderThickness="0,0,0,1"
-                    BorderBrush="{StaticResource BorderSubtleBrush}">
-                <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                              VerticalScrollBarVisibility="Disabled">
-                    <ItemsControl x:Name="BookmarksList">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Cursor="Hand"
-                                        CornerRadius="4"
-                                        Padding="6,3"
-                                        Margin="0,0,4,0"
-                                        Background="Transparent"
-                                        ToolTip="{Binding Url}"
-                                        MouseLeftButtonDown="BookmarkBarItem_Click">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="&#xE735;"
-                                                   FontFamily="Segoe Fluent Icons"
-                                                   FontSize="11"
-                                                   Foreground="#FFF59E0B"
-                                                   Margin="0,0,5,0"
-                                                   VerticalAlignment="Center" />
-                                        <TextBlock Text="{Binding Title}"
-                                                   FontSize="11"
-                                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                                   MaxWidth="130"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+                    BorderBrush="{StaticResource BorderSubtleBrush}"
+                    MouseRightButtonUp="BookmarksBar_MouseRightButtonUp">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Scrollable Bookmarks list -->
+                    <ScrollViewer Grid.Column="0"
+                                  x:Name="BookmarksScrollViewer"
+                                  HorizontalScrollBarVisibility="Hidden"
+                                  VerticalScrollBarVisibility="Disabled"
+                                  PreviewMouseWheel="BookmarksScrollViewer_PreviewMouseWheel"
+                                  VerticalAlignment="Center">
+                        <ItemsControl x:Name="BookmarksList">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource BookmarkItemButtonStyle}"
+                                            ToolTip="{Binding Url}"
+                                            Click="BookmarkBarItem_Click"
+                                            PreviewMouseRightButtonUp="BookmarkItem_PreviewMouseRightButtonUp">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <!-- Favicon with Globe fallback -->
+                                            <Grid Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center">
+                                                <TextBlock Text="&#xE774;"
+                                                           FontFamily="Segoe Fluent Icons"
+                                                           FontSize="11"
+                                                           Foreground="{StaticResource TextMutedBrush}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center" />
+                                                <Image Source="{Binding FaviconUrl}"
+                                                       Width="16" Height="16"
+                                                       RenderOptions.BitmapScalingMode="HighQuality" />
+                                            </Grid>
+                                            <TextBlock Text="{Binding Title}"
+                                                       FontSize="12"
+                                                       Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
+                                                       MaxWidth="135"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <!-- Bookmarks bar actions & overflow menu -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                        <Button x:Name="BtnScrollBookmarksLeft"
+                                Click="BtnScrollBookmarksLeft_Click"
+                                Content="&#xE76B;"
+                                FontFamily="Segoe Fluent Icons"
+                                FontSize="9"
+                                ToolTip="Nach links scrollen"
+                                Style="{StaticResource NavButtonStyle}"
+                                Width="24" Height="24"
+                                Margin="1,0" />
+
+                        <Button x:Name="BtnScrollBookmarksRight"
+                                Click="BtnScrollBookmarksRight_Click"
+                                Content="&#xE76C;"
+                                FontFamily="Segoe Fluent Icons"
+                                FontSize="9"
+                                ToolTip="Nach rechts scrollen"
+                                Style="{StaticResource NavButtonStyle}"
+                                Width="24" Height="24"
+                                Margin="1,0" />
+
+                        <!-- Overflow button with chevron -->
+                        <Button x:Name="BtnBookmarksOverflow"
+                                Click="BtnBookmarksOverflow_Click"
+                                Content="&#xE70D;"
+                                FontFamily="Segoe Fluent Icons"
+                                FontSize="11"
+                                ToolTip="Alle Lesezeichen anzeigen &amp; durchsuchen"
+                                Style="{StaticResource NavButtonStyle}"
+                                Width="26" Height="26"
+                                Margin="2,0,0,0" />
+
+                        <!-- Overflow Flyout Popup -->
+                        <Popup x:Name="BookmarksOverflowPopup"
+                               PlacementTarget="{Binding ElementName=BtnBookmarksOverflow}"
+                               Placement="Bottom"
+                               AllowsTransparency="True"
+                               StaysOpen="False"
+                               VerticalOffset="6"
+                               HorizontalOffset="-260">
+                            <Border Background="{StaticResource BgSurfaceBrush}"
+                                    BorderBrush="{StaticResource BorderDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Width="300"
+                                    MaxHeight="460"
+                                    Padding="0">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="16" Direction="270" Opacity="0.5" ShadowDepth="4" Color="#000000" />
+                                </Border.Effect>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Header -->
+                                    <Border Grid.Row="0"
+                                            BorderThickness="0,0,0,1"
+                                            BorderBrush="{StaticResource BorderSubtleBrush}"
+                                            Padding="12,10">
+                                        <DockPanel>
+                                            <TextBlock Text="⭐ Alle Lesezeichen"
+                                                       FontWeight="SemiBold"
+                                                       FontSize="13"
+                                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                                       VerticalAlignment="Center" />
+                                            <TextBlock x:Name="TxtBookmarksCount"
+                                                       Text=""
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="6,0,0,0" />
+                                        </DockPanel>
+                                    </Border>
+
+                                    <!-- Search Filter -->
+                                    <Border Grid.Row="1"
+                                            Margin="10,8,10,6"
+                                            Background="{StaticResource BgDeepBrush}"
+                                            BorderBrush="{StaticResource BorderSubtleBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Padding="8,4">
+                                        <DockPanel>
+                                            <TextBlock Text="&#xE721;"
+                                                       FontFamily="Segoe Fluent Icons"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="0,0,6,0" />
+                                            <TextBox x:Name="TxtSearchBookmarks"
+                                                     Background="Transparent"
+                                                     BorderThickness="0"
+                                                     Foreground="{StaticResource TextPrimaryBrush}"
+                                                     FontSize="11"
+                                                     TextChanged="TxtSearchBookmarks_TextChanged" />
+                                        </DockPanel>
+                                    </Border>
+
+                                    <!-- List -->
+                                    <ScrollViewer Grid.Row="2"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  Margin="4,0,4,8">
+                                        <ItemsControl x:Name="BookmarksOverflowList">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Style="{StaticResource BookmarkItemButtonStyle}"
+                                                            HorizontalContentAlignment="Left"
+                                                            HorizontalAlignment="Stretch"
+                                                            Height="30"
+                                                            Padding="8,0"
+                                                            Margin="0,1"
+                                                            ToolTip="{Binding Url}"
+                                                            Click="BookmarkBarItem_Click"
+                                                            PreviewMouseRightButtonUp="BookmarkItem_PreviewMouseRightButtonUp">
+                                                        <DockPanel LastChildFill="True">
+                                                            <Grid Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" DockPanel.Dock="Left">
+                                                                <TextBlock Text="&#xE774;"
+                                                                           FontFamily="Segoe Fluent Icons"
+                                                                           FontSize="11"
+                                                                           Foreground="{StaticResource TextMutedBrush}"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center" />
+                                                                <Image Source="{Binding FaviconUrl}"
+                                                                       Width="16" Height="16"
+                                                                       RenderOptions.BitmapScalingMode="HighQuality" />
+                                                            </Grid>
+                                                            <TextBlock Text="{Binding Title}"
+                                                                       FontSize="12"
+                                                                       Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
+                                                                       VerticalAlignment="Center"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                        </DockPanel>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+                        </Popup>
+                    </StackPanel>
+                </Grid>
             </Border>
 
             <!-- ═══ Content area (WebView2 + Overlays + AI Sidebar) ═══ -->

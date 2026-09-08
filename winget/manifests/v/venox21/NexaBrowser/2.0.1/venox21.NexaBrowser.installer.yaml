@@ -25,7 +25,7 @@ Protocols:
 Installers:
   - Architecture: x64
     InstallerUrl: https://github.com/venox21/Nexa-Browser/releases/download/Installer/NexaSetup.exe
-    InstallerSha256: 3EDA9C8C95970C524A19ABAA7B96D3C3D5224CB702F956E2DA863B7D544CFCAA
+    InstallerSha256: 156BEBF3CE8D18540F130877CB992F468DCBF1F2977DD251B5305322DDF9E26A
     ProductCode: NexaBrowser
 ManifestType: installer
 ManifestVersion: 1.6.0

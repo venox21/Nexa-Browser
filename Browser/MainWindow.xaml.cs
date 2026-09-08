@@ -64,6 +64,7 @@ namespace Browser
 
             HistoryList.ItemsSource = HistoryService.Instance.History;
             BookmarksList.ItemsSource = BookmarkService.Instance.Bookmarks;
+            BookmarksOverflowList.ItemsSource = BookmarkService.Instance.Bookmarks;
             BookmarkService.Instance.BookmarksChanged += UpdateBookmarkStar;
             SpeedDialService.Instance.SpeedDialChanged += OnSpeedDialChanged;
 
@@ -2706,12 +2707,161 @@ namespace Browser
             ScheduleHideStatus(2500);
         }
 
-        private void BookmarkBarItem_Click(object sender, MouseButtonEventArgs e)
+        private void BookmarkBarItem_Click(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement el && el.DataContext is BookmarkItem bookmark)
             {
+                if (BookmarksOverflowPopup != null && BookmarksOverflowPopup.IsOpen)
+                    BookmarksOverflowPopup.IsOpen = false;
+
                 NavigateTo(bookmark.Url);
             }
+        }
+
+        private void BookmarksScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (BookmarksScrollViewer != null)
+            {
+                double targetOffset = BookmarksScrollViewer.HorizontalOffset - (e.Delta * 0.85);
+                BookmarksScrollViewer.ScrollToHorizontalOffset(Math.Max(0, targetOffset));
+                e.Handled = true;
+            }
+        }
+
+        private void BtnScrollBookmarksLeft_Click(object sender, RoutedEventArgs e)
+        {
+            BookmarksScrollViewer?.ScrollToHorizontalOffset(Math.Max(0, BookmarksScrollViewer.HorizontalOffset - 180));
+        }
+
+        private void BtnScrollBookmarksRight_Click(object sender, RoutedEventArgs e)
+        {
+            if (BookmarksScrollViewer != null)
+                BookmarksScrollViewer.ScrollToHorizontalOffset(BookmarksScrollViewer.HorizontalOffset + 180);
+        }
+
+        private void BtnBookmarksOverflow_Click(object sender, RoutedEventArgs e)
+        {
+            if (BookmarksOverflowPopup == null) return;
+            BookmarksOverflowPopup.IsOpen = !BookmarksOverflowPopup.IsOpen;
+            if (BookmarksOverflowPopup.IsOpen)
+            {
+                TxtSearchBookmarks.Text = string.Empty;
+                var allBookmarks = BookmarkService.Instance.Bookmarks;
+                BookmarksOverflowList.ItemsSource = allBookmarks;
+                TxtBookmarksCount.Text = $"({allBookmarks.Count})";
+                TxtSearchBookmarks.Focus();
+            }
+        }
+
+        private void TxtSearchBookmarks_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (BookmarksOverflowList == null) return;
+            var query = TxtSearchBookmarks?.Text?.Trim() ?? string.Empty;
+            var all = BookmarkService.Instance.Bookmarks;
+            if (string.IsNullOrEmpty(query))
+            {
+                BookmarksOverflowList.ItemsSource = all;
+                if (TxtBookmarksCount != null)
+                    TxtBookmarksCount.Text = $"({all.Count})";
+            }
+            else
+            {
+                var filtered = all.Where(b =>
+                    (!string.IsNullOrEmpty(b.Title) && b.Title.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrEmpty(b.Url) && b.Url.Contains(query, StringComparison.OrdinalIgnoreCase))
+                ).ToList();
+                BookmarksOverflowList.ItemsSource = filtered;
+                if (TxtBookmarksCount != null)
+                    TxtBookmarksCount.Text = $"({filtered.Count}/{all.Count})";
+            }
+        }
+
+        private void BookmarkItem_PreviewMouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is FrameworkElement el && el.DataContext is BookmarkItem bookmark)
+            {
+                e.Handled = true;
+                var cm = new ContextMenu();
+
+                var itemOpenNewTab = new MenuItem { Header = "In neuem Tab öffnen" };
+                itemOpenNewTab.Click += (_, _) =>
+                {
+                    if (BookmarksOverflowPopup != null && BookmarksOverflowPopup.IsOpen)
+                        BookmarksOverflowPopup.IsOpen = false;
+                    _tabManager.AddTab(bookmark.Url);
+                };
+                cm.Items.Add(itemOpenNewTab);
+
+                var itemCopy = new MenuItem { Header = "Linkadresse kopieren" };
+                itemCopy.Click += (_, _) =>
+                {
+                    try
+                    {
+                        Clipboard.SetText(bookmark.Url);
+                        ShowStatus("Link in Zwischenablage kopiert");
+                        ScheduleHideStatus(2000);
+                    }
+                    catch { }
+                };
+                cm.Items.Add(itemCopy);
+
+                cm.Items.Add(new Separator());
+
+                var itemDelete = new MenuItem { Header = "Lesezeichen löschen" };
+                itemDelete.Click += (_, _) =>
+                {
+                    BookmarkService.Instance.RemoveBookmark(bookmark);
+                    UpdateBookmarkStar();
+                    if (BookmarksOverflowPopup != null && BookmarksOverflowPopup.IsOpen)
+                    {
+                        var all = BookmarkService.Instance.Bookmarks;
+                        BookmarksOverflowList.ItemsSource = all;
+                        if (TxtBookmarksCount != null)
+                            TxtBookmarksCount.Text = $"({all.Count})";
+                    }
+                    ShowStatus("Lesezeichen gelöscht");
+                    ScheduleHideStatus(2000);
+                };
+                cm.Items.Add(itemDelete);
+
+                cm.Items.Add(new Separator());
+
+                var itemToggleBar = new MenuItem { Header = "Lesezeichenleiste ausblenden (Strg+Umschalt+B)" };
+                itemToggleBar.Click += (_, _) => ToggleBookmarksBar();
+                cm.Items.Add(itemToggleBar);
+
+                cm.PlacementTarget = el;
+                cm.IsOpen = true;
+            }
+        }
+
+        private void BookmarksBar_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (e.Handled) return;
+
+            var cm = new ContextMenu();
+
+            var itemAdd = new MenuItem { Header = "Aktuelle Seite als Lesezeichen speichern (Strg+D)" };
+            itemAdd.Click += (_, _) => ToggleCurrentBookmark();
+            cm.Items.Add(itemAdd);
+
+            cm.Items.Add(new Separator());
+
+            var itemToggleBar = new MenuItem { Header = "Lesezeichenleiste ausblenden (Strg+Umschalt+B)" };
+            itemToggleBar.Click += (_, _) => ToggleBookmarksBar();
+            cm.Items.Add(itemToggleBar);
+
+            cm.PlacementTarget = BookmarksBar;
+            cm.IsOpen = true;
+            e.Handled = true;
+        }
+
+        public void ToggleBookmarksBar()
+        {
+            if (BookmarksBar == null) return;
+            BookmarksBar.Visibility = BookmarksBar.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+            ShowStatus(BookmarksBar.Visibility == Visibility.Visible ? "Lesezeichenleiste eingeblendet" : "Lesezeichenleiste ausgeblendet");
+            ScheduleHideStatus(2000);
         }
 
         // ── History UI ──────────────────────────────────────────
@@ -2884,9 +3034,7 @@ namespace Browser
         private void MenuToggleBookmarksBar_Click(object sender, RoutedEventArgs e)
         {
             AppMenuPopup.IsOpen = false;
-            BookmarksBar.Visibility = BookmarksBar.Visibility == Visibility.Visible
-                ? Visibility.Collapsed
-                : Visibility.Visible;
+            ToggleBookmarksBar();
         }
 
         private void MenuClearData_Click(object sender, RoutedEventArgs e)
@@ -3430,6 +3578,15 @@ namespace Browser
             {
                 e.Handled = true;
                 ToggleAiSidebar();
+                return;
+            }
+
+            // Ctrl+Shift+B: Toggle Bookmarks Bar
+            if (e.Key == Key.B &&
+                (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift))
+            {
+                e.Handled = true;
+                ToggleBookmarksBar();
                 return;
             }
 
