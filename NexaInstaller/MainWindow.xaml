@@ -393,12 +393,12 @@
                                         Margin="0,0,8,0"
                                         ToolTip="Löscht die vorhandene Version von Nexa Browser vom Computer" />
                                 <Button x:Name="BtnWelcomeReinstall"
-                                        Click="BtnUpdate_Click"
-                                        Content="🔄 Neu installieren"
+                                        Click="BtnWelcomeLaunchOrReinstall_Click"
+                                        Content="🚀 Browser starten"
                                         Style="{StaticResource Win11SecondaryButtonStyle}"
                                         Margin="0,0,8,0"
-                                        Visibility="Collapsed"
-                                        ToolTip="Überschreibt und repariert die vorhandene Installation" />
+                                        Visibility="Visible"
+                                        ToolTip="Startet den installierten Nexa Browser" />
                                 <Button x:Name="BtnGoCustomize"
                                         Click="BtnGoCustomize_Click"
                                         Content="⚙️ Anpassen"

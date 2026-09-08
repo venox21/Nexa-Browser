@@ -31,8 +31,8 @@ namespace NexaInstaller
         private string _existingVersion = string.Empty;
         private bool _isUninstallMode = false;
 
-        private static readonly Version TargetVersion = new Version(2, 0, 0);
-        private const string TargetVersionDisplay = "2.0.0";
+        private static readonly Version TargetVersion = new Version(2, 0, 1);
+        private const string TargetVersionDisplay = "2.0.1";
 
         public MainWindow()
         {
@@ -158,30 +158,36 @@ namespace NexaInstaller
 
                 if (installedVer < TargetVersion)
                 {
-                    // UPDATE AVAILABLE: Version goes up to 2.0!
+                    // UPDATE AVAILABLE: Clear upgrade prompt!
                     TxtDetectedIcon.Text = "🚀";
-                    TxtDetectedHeader.Text = "Update auf Version 2.0 verfügbar!";
-                    TxtDetectedVersion.Text = $"v{_existingVersion} ➜ v2.0";
+                    TxtDetectedHeader.Text = $"Update auf Version {TargetVersionDisplay} verfügbar!";
+                    TxtDetectedVersion.Text = $"v{_existingVersion} ➜ v{TargetVersionDisplay}";
                     BorderExistingInstall.BorderBrush = new SolidColorBrush(Color.FromRgb(0x63, 0x66, 0xF1));
                     BorderExistingInstall.Background = new SolidColorBrush(Color.FromRgb(0x13, 0x17, 0x35));
                     ShadowExistingInstall.Color = Color.FromRgb(0x63, 0x66, 0xF1);
 
-                    BtnWelcomeUpdate.Content = "🔄 Auf Version 2.0 aktualisieren";
-                    BtnWelcomeUpdate.ToolTip = "Überschreibt die alte Version und aktualisiert auf Version 2.0";
-                    BtnWelcomeReinstall.Visibility = Visibility.Collapsed;
+                    BtnWelcomeUpdate.Content = $"🔄 Jetzt auf Version {TargetVersionDisplay} aktualisieren";
+                    BtnWelcomeUpdate.ToolTip = "Überschreibt alle Dateien und bringt die Installation auf die neueste Version";
+                    
+                    BtnWelcomeReinstall.Content = "🚀 Browser starten";
+                    BtnWelcomeReinstall.ToolTip = "Startet den vorhandenen Browser";
+                    BtnWelcomeReinstall.Visibility = Visibility.Visible;
                 }
                 else
                 {
-                    // NO UPDATE AVAILABLE: Clean window state!
+                    // CURRENT VERSION: Allow direct re-install/update anytime!
                     TxtDetectedIcon.Text = "✓";
-                    TxtDetectedHeader.Text = "Nexa Browser ist auf dem neuesten Stand";
+                    TxtDetectedHeader.Text = $"Nexa Browser v{_existingVersion} ist installiert";
                     TxtDetectedVersion.Text = $"v{_existingVersion} (Aktuell)";
                     BorderExistingInstall.BorderBrush = new SolidColorBrush(Color.FromRgb(0x10, 0xB9, 0x81));
                     BorderExistingInstall.Background = new SolidColorBrush(Color.FromRgb(0x0A, 0x24, 0x1B));
                     ShadowExistingInstall.Color = Color.FromRgb(0x10, 0xB9, 0x81);
 
-                    BtnWelcomeUpdate.Content = "🚀 Browser starten";
-                    BtnWelcomeUpdate.ToolTip = "Startet den installierten Nexa Browser v2.0";
+                    BtnWelcomeUpdate.Content = "🔄 Jetzt aktualisieren / Reparieren";
+                    BtnWelcomeUpdate.ToolTip = "Erneuert alle Programmdateien mit den neuesten Updates und Patches";
+
+                    BtnWelcomeReinstall.Content = "🚀 Browser starten";
+                    BtnWelcomeReinstall.ToolTip = "Startet den installierten Nexa Browser";
                     BtnWelcomeReinstall.Visibility = Visibility.Visible;
                 }
 
@@ -289,28 +295,30 @@ namespace NexaInstaller
 
         private void BtnWelcomeUpdate_Click(object sender, RoutedEventArgs e)
         {
-            var installedVer = ParseVersionString(_existingVersion);
-            if (installedVer >= TargetVersion)
+            // Clicking "Jetzt aktualisieren" ALWAYS executes the update/repair!
+            BtnUpdate_Click(sender, e);
+        }
+
+        private void BtnWelcomeLaunchOrReinstall_Click(object sender, RoutedEventArgs e)
+        {
+            // If the button says "Browser starten", launch the existing browser
+            var exePath = Path.Combine(_existingInstallPath, "Nexa.exe");
+            if (File.Exists(exePath))
             {
-                // Already on v2.0 or higher: launch the browser directly!
-                var exePath = Path.Combine(_existingInstallPath, "Nexa.exe");
-                if (File.Exists(exePath))
+                try
                 {
-                    try
+                    Process.Start(new ProcessStartInfo
                     {
-                        Process.Start(new ProcessStartInfo
-                        {
-                            FileName = exePath,
-                            UseShellExecute = true
-                        });
-                        Close();
-                        return;
-                    }
-                    catch { }
+                        FileName = exePath,
+                        UseShellExecute = true
+                    });
+                    Close();
+                    return;
                 }
+                catch { }
             }
 
-            // Otherwise run update to overwrite files and upgrade to Version 2.0!
+            // Fallback: update/repair
             BtnUpdate_Click(sender, e);
         }
 

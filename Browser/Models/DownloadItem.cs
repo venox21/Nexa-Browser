@@ -124,7 +124,11 @@ namespace Browser.Models
             set { _errorMessage = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusText)); }
         }
 
-        public int ProgressPercent => TotalBytes > 0 ? Math.Clamp((int)((ReceivedBytes * 100) / TotalBytes), 0, 100) : 0;
+        public int ProgressPercent
+        {
+            get => TotalBytes > 0 ? Math.Clamp((int)((ReceivedBytes * 100) / TotalBytes), 0, 100) : 0;
+            set { }
+        }
 
         public string ProgressText
         {

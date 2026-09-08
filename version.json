@@ -1,18 +1,17 @@
 {
-  "version": "2.0.0",
-  "display_version": "v2.0",
-  "release_name": "Nexa Browser v2.0 – Turbo Performance Edition",
+  "version": "2.0.1",
+  "display_version": "v2.0.1",
+  "release_name": "Nexa Browser v2.0.1 – Download Manager & Updater Patch",
   "release_date": "2026-09-08",
   "download_url": "https://github.com/venox21/Nexa-Browser/releases/latest/download/NexaSetup.exe",
   "raw_setup_url": "https://github.com/venox21/Nexa-Browser/raw/main/NexaSetup.exe",
   "repository_url": "https://github.com/venox21/Nexa-Browser",
   "min_os_version": "Windows 10 / Windows 11 (64-Bit)",
   "changelog": [
-    "⚡ Turbo-DNS Prefetching: Paralleles DNS-Prewarming für Top-Domains & Omnibox-Preconnect",
-    "🚀 Chromium BackForwardCache: Blitzschnelles Vor- und Zurück-Navigieren ohne erneutes Laden",
-    "💾 500 MB optimierter Browser-Cache & V8-Bytecode Caching für spürbar verkürzte Ladezeiten",
-    "🛡️ Shield Pro AdBlocker: FrozenSet Domain-Lookups & reduzierte Script-Injections",
-    "📦 Windows 11 Fluent Installer mit Direkt-Update-Modus und vollständiger Deinstallation",
-    "🔄 Integrierter GitHub Auto-Updater für Browser und Installer"
+    "📥 Neuer Download-Manager mit flüssigem Fortschrittsbalken & Sofort-Start-Buttons",
+    "🔔 Akustische und visuelle Fertigmeldung bei abgeschlossenen Downloads",
+    "🛡️ Behebung des Einfrierens bei Sicherheitsfreigaben ('Trotzdem behalten')",
+    "🔄 Direkte Aktualisierungs-Funktion im Installer ('Jetzt aktualisieren')",
+    "⚡ Turbo-DNS Prefetching, Instant-Cache & Shield Pro AdBlocker"
   ]
 }
