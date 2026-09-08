@@ -58,6 +58,8 @@ namespace Browser
 
             DownloadsList.ItemsSource = DownloadManager.Instance.Downloads;
             DownloadManager.Instance.ActiveCountChanged += UpdateDownloadBadge;
+            DownloadManager.Instance.DownloadStarted += OnDownloadStarted;
+            DownloadManager.Instance.DownloadCompleted += OnDownloadCompleted;
             UpdateDownloadBadge();
 
             HistoryList.ItemsSource = HistoryService.Instance.History;
@@ -1885,6 +1887,33 @@ namespace Browser
             }
         }
 
+        private void OnDownloadStarted(DownloadItem item)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                DownloadsPopup.IsOpen = true;
+                UpdateDownloadBadge();
+            });
+        }
+
+        private void OnDownloadCompleted(DownloadItem item)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                // Play completion chime
+                try
+                {
+                    System.Media.SystemSounds.Asterisk.Play();
+                }
+                catch { }
+
+                DownloadsPopup.IsOpen = true;
+                UpdateDownloadBadge();
+                ShowStatus($"✓ Download fertig: {item.FileName}");
+                ScheduleHideStatus(7000);
+            });
+        }
+
         private void BtnDownloads_Click(object sender, RoutedEventArgs e)
         {
             DownloadsPopup.IsOpen = !DownloadsPopup.IsOpen;
@@ -1934,9 +1963,17 @@ namespace Browser
         {
             if (sender is FrameworkElement el && el.Tag is DownloadItem item)
             {
-                item.IsWarningDismissed = true;
+                DownloadManager.Instance.KeepAndResume(item);
                 ShowStatus($"Download '{item.FileName}' freigegeben.");
                 ScheduleHideStatus(3000);
+            }
+        }
+
+        private void BtnRemoveDownload_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement el && el.Tag is DownloadItem item)
+            {
+                DownloadManager.Instance.RemoveDownload(item);
             }
         }
 

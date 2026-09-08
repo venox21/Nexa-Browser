@@ -23,6 +23,8 @@ namespace Browser.Services
         public ObservableCollection<DownloadItem> Downloads { get; } = new();
 
         public event Action? ActiveCountChanged;
+        public event Action<DownloadItem>? DownloadStarted;
+        public event Action<DownloadItem>? DownloadCompleted;
 
         public int ActiveDownloadsCount => Downloads.Count(d => d.Status == DownloadStatus.InProgress);
 
@@ -47,14 +49,14 @@ namespace Browser.Services
             catch { }
 
             var suggested = Path.GetFileName(e.ResultFilePath ?? "download");
-            var (risk, reason) = EvaluateFileRisk(suggested);
+            var (risk, reason) = EvaluateFileRisk(suggested, e.DownloadOperation?.Uri);
 
             var item = new DownloadItem
             {
                 FileName = Path.GetFileName(e.ResultFilePath ?? "download"),
                 FilePath = e.ResultFilePath ?? string.Empty,
-                Uri = e.DownloadOperation.Uri,
-                TotalBytes = (long)(e.DownloadOperation.TotalBytesToReceive ?? 0),
+                Uri = e.DownloadOperation?.Uri ?? string.Empty,
+                TotalBytes = (long)(e.DownloadOperation?.TotalBytesToReceive ?? 0),
                 ReceivedBytes = 0,
                 Status = DownloadStatus.InProgress,
                 Operation = e.DownloadOperation,
@@ -66,11 +68,13 @@ namespace Browser.Services
             {
                 Downloads.Insert(0, item);
                 ActiveCountChanged?.Invoke();
+                DownloadStarted?.Invoke(item);
             });
 
             onStatusUpdate?.Invoke($"Download gestartet: {item.FileName}");
 
             var op = e.DownloadOperation;
+            if (op == null) return item;
 
             op.BytesReceivedChanged += (s, args) =>
             {
@@ -93,8 +97,9 @@ namespace Browser.Services
                         case CoreWebView2DownloadState.Completed:
                             item.Status = DownloadStatus.Completed;
                             item.ReceivedBytes = item.TotalBytes > 0 ? item.TotalBytes : (long)op.BytesReceived;
-                            onStatusUpdate?.Invoke($"Download abgeschlossen: {item.FileName}");
+                            onStatusUpdate?.Invoke($"✓ Download abgeschlossen: {item.FileName}");
                             SaveHistory();
+                            DownloadCompleted?.Invoke(item);
                             break;
 
                         case CoreWebView2DownloadState.Interrupted:
@@ -109,6 +114,38 @@ namespace Browser.Services
             };
 
             return item;
+        }
+
+        public void KeepAndResume(DownloadItem item)
+        {
+            if (item == null) return;
+            item.IsWarningDismissed = true;
+
+            try
+            {
+                if (item.Operation != null && item.Operation.CanResume)
+                {
+                    item.Operation.Resume();
+                }
+            }
+            catch { }
+
+            // Check if file is already on disk and complete
+            if (File.Exists(item.FilePath))
+            {
+                try
+                {
+                    var fileInfo = new FileInfo(item.FilePath);
+                    if (fileInfo.Length > 0 && (item.TotalBytes <= 0 || fileInfo.Length >= item.TotalBytes || item.Status == DownloadStatus.Completed))
+                    {
+                        item.Status = DownloadStatus.Completed;
+                        item.ReceivedBytes = fileInfo.Length;
+                        DownloadCompleted?.Invoke(item);
+                    }
+                }
+                catch { }
+            }
+            SaveHistory();
         }
 
         public void CancelDownload(DownloadItem item)
@@ -239,9 +276,24 @@ namespace Browser.Services
             ".iso", ".img", ".vhd", ".vhdx", ".reg", ".jar", ".hta", ".cpl", ".msc"
         };
 
-        public static (DownloadRiskLevel Risk, string Reason) EvaluateFileRisk(string fileName)
+        public static (DownloadRiskLevel Risk, string Reason) EvaluateFileRisk(string fileName, string? uri = null)
         {
             if (string.IsNullOrWhiteSpace(fileName)) return (DownloadRiskLevel.Safe, "");
+
+            // Whitelist official Nexa installers and releases
+            if (fileName.StartsWith("NexaSetup", StringComparison.OrdinalIgnoreCase) ||
+                fileName.StartsWith("Nexa-Browser", StringComparison.OrdinalIgnoreCase) ||
+                fileName.StartsWith("NexaBrowser", StringComparison.OrdinalIgnoreCase))
+            {
+                return (DownloadRiskLevel.Safe, "");
+            }
+
+            if (!string.IsNullOrEmpty(uri) && (
+                uri.Contains("github.com/venox21/Nexa-Browser", StringComparison.OrdinalIgnoreCase) ||
+                (uri.Contains("objects.githubusercontent.com", StringComparison.OrdinalIgnoreCase) && uri.Contains("Nexa", StringComparison.OrdinalIgnoreCase))))
+            {
+                return (DownloadRiskLevel.Safe, "");
+            }
 
             var ext = Path.GetExtension(fileName).ToLowerInvariant();
 
@@ -255,7 +307,7 @@ namespace Browser.Services
 
             if (DangerousExtensions.Contains(ext))
             {
-                return (DownloadRiskLevel.Warning, $"Ausführbare Datei ({ext}) – Kann Systemänderungen vornehmen oder Programme installieren.");
+                return (DownloadRiskLevel.Warning, $"Ausführbare Datei ({ext}) – Bitte prüfe, ob du dieser Datei vertraust.");
             }
 
             return (DownloadRiskLevel.Safe, "");

@@ -392,7 +392,6 @@
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center" />
                             </Border>
-
                             <!-- Downloads Flyout Popup -->
                             <Popup x:Name="DownloadsPopup"
                                    PlacementTarget="{Binding ElementName=BtnDownloads}"
@@ -400,16 +399,16 @@
                                    AllowsTransparency="True"
                                    StaysOpen="False"
                                    VerticalOffset="6"
-                                   HorizontalOffset="-300">
+                                   HorizontalOffset="-320">
                                 <Border Background="{StaticResource BgSurfaceBrush}"
                                         BorderBrush="{StaticResource BorderDefaultBrush}"
                                         BorderThickness="1"
                                         CornerRadius="10"
-                                        Width="340"
-                                        MaxHeight="420"
+                                        Width="360"
+                                        MaxHeight="440"
                                         Padding="0">
                                     <Border.Effect>
-                                        <DropShadowEffect BlurRadius="12" Direction="270" Opacity="0.4" ShadowDepth="4" Color="#000000" />
+                                        <DropShadowEffect BlurRadius="16" Direction="270" Opacity="0.45" ShadowDepth="4" Color="#000000" />
                                     </Border.Effect>
                                     <Grid>
                                         <Grid.RowDefinitions>
@@ -445,7 +444,7 @@
                                             <ItemsControl x:Name="DownloadsList">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Border Padding="12,8"
+                                                        <Border Padding="12,10"
                                                                 BorderThickness="0,0,0,1"
                                                                 BorderBrush="{StaticResource BorderSubtleBrush}">
                                                             <Grid>
@@ -457,23 +456,72 @@
 
                                                                 <!-- Status icon -->
                                                                 <TextBlock Grid.Column="0"
-                                                                           Text="&#xE896;"
                                                                            FontFamily="Segoe Fluent Icons"
-                                                                           FontSize="14"
-                                                                           Foreground="{StaticResource AccentLightBrush}"
-                                                                           VerticalAlignment="Center" />
+                                                                           FontSize="15"
+                                                                           VerticalAlignment="Top"
+                                                                           Margin="0,2,0,0">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Text" Value="&#xE896;" />
+                                                                            <Setter Property="Foreground" Value="{StaticResource AccentLightBrush}" />
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                                                                    <Setter Property="Text" Value="&#xE73E;" />
+                                                                                    <Setter Property="Foreground" Value="#10B981" />
+                                                                                </DataTrigger>
+                                                                                <DataTrigger Binding="{Binding ShowWarningPrompt}" Value="True">
+                                                                                    <Setter Property="Text" Value="&#xE7BA;" />
+                                                                                    <Setter Property="Foreground" Value="#EF4444" />
+                                                                                </DataTrigger>
+                                                                                <DataTrigger Binding="{Binding IsInterrupted}" Value="True">
+                                                                                    <Setter Property="Text" Value="&#xE711;" />
+                                                                                    <Setter Property="Foreground" Value="#EF4444" />
+                                                                                </DataTrigger>
+                                                                                <DataTrigger Binding="{Binding IsCancelled}" Value="True">
+                                                                                    <Setter Property="Text" Value="&#xE711;" />
+                                                                                    <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
 
                                                                 <!-- Details -->
                                                                 <StackPanel Grid.Column="1" Margin="4,0,8,0">
                                                                     <TextBlock Text="{Binding FileName}"
-                                                                               FontWeight="Medium"
+                                                                               FontWeight="SemiBold"
                                                                                FontSize="12"
                                                                                Foreground="{StaticResource TextPrimaryBrush}"
                                                                                TextTrimming="CharacterEllipsis" />
 
                                                                     <TextBlock Text="{Binding StatusText}"
                                                                                FontSize="11"
-                                                                               Foreground="{StaticResource TextMutedBrush}" />
+                                                                               Margin="0,1,0,0">
+                                                                        <TextBlock.Style>
+                                                                            <Style TargetType="TextBlock">
+                                                                                <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                                                                        <Setter Property="Foreground" Value="#10B981" />
+                                                                                        <Setter Property="FontWeight" Value="Medium" />
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding IsInterrupted}" Value="True">
+                                                                                        <Setter Property="Foreground" Value="#EF4444" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </TextBlock.Style>
+                                                                    </TextBlock>
+
+                                                                    <!-- Fluent Animated Progress Bar -->
+                                                                    <ProgressBar Value="{Binding ProgressPercent}"
+                                                                                 Minimum="0" Maximum="100"
+                                                                                 Height="4"
+                                                                                 Margin="0,6,0,2"
+                                                                                 Foreground="{StaticResource AccentLightBrush}"
+                                                                                 Background="{StaticResource BgHoverBrush}"
+                                                                                 BorderThickness="0"
+                                                                                 Visibility="{Binding InProgressVisibility}" />
 
                                                                     <!-- Security Warning Banner for High Risk Download -->
                                                                     <Border Visibility="{Binding WarningBadgeVisibility}"
@@ -481,25 +529,75 @@
                                                                             BorderBrush="#80EF4444"
                                                                             BorderThickness="1"
                                                                             CornerRadius="6"
-                                                                            Padding="6,4"
-                                                                            Margin="0,4,0,0">
+                                                                            Padding="8,6"
+                                                                            Margin="0,6,0,0">
                                                                         <StackPanel>
-                                                                            <TextBlock Text="{Binding RiskReason}" FontSize="10" Foreground="#FFF87171" TextWrapping="Wrap" />
-                                                                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                                                                <Button Tag="{Binding}" Content="Verwerfen" Click="BtnDiscardDownload_Click" FontSize="10" Padding="6,2" Background="#40EF4444" Foreground="#FFF87171" BorderThickness="0" Cursor="Hand" Margin="0,0,6,0" />
-                                                                                <Button Tag="{Binding}" Content="Trotzdem behalten" Click="BtnKeepDownload_Click" FontSize="10" Padding="6,2" Background="Transparent" Foreground="{StaticResource TextSecondaryBrush}" BorderThickness="0" Cursor="Hand" />
+                                                                            <TextBlock Text="{Binding RiskReason}" FontSize="10.5" Foreground="#FFF87171" TextWrapping="Wrap" />
+                                                                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                                                                <Button Tag="{Binding}" Content="🛡️ Trotzdem behalten" Click="BtnKeepDownload_Click"
+                                                                                        FontSize="11" FontWeight="SemiBold" Padding="8,3"
+                                                                                        Background="#3510B981" Foreground="#34D399"
+                                                                                        BorderBrush="#6010B981" BorderThickness="1"
+                                                                                        Cursor="Hand" Margin="0,0,6,0">
+                                                                                    <Button.Resources>
+                                                                                        <Style TargetType="Border">
+                                                                                            <Setter Property="CornerRadius" Value="4" />
+                                                                                        </Style>
+                                                                                    </Button.Resources>
+                                                                                </Button>
+                                                                                <Button Tag="{Binding}" Content="Verwerfen" Click="BtnDiscardDownload_Click"
+                                                                                        FontSize="10.5" Padding="6,3"
+                                                                                        Background="Transparent" Foreground="{StaticResource TextSecondaryBrush}"
+                                                                                        BorderThickness="0" Cursor="Hand" />
                                                                             </StackPanel>
                                                                         </StackPanel>
                                                                     </Border>
+
+                                                                    <!-- Completed Action Buttons -->
+                                                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Visibility="{Binding CompletedVisibility}">
+                                                                        <!-- Primary Open File Button -->
+                                                                        <Button Tag="{Binding}" Click="BtnOpenDownloadFile_Click"
+                                                                                Padding="10,4" Margin="0,0,6,0"
+                                                                                Background="{StaticResource AccentBrush}"
+                                                                                Foreground="White" FontWeight="SemiBold" FontSize="11"
+                                                                                BorderThickness="0" Cursor="Hand">
+                                                                            <Button.Resources>
+                                                                                <Style TargetType="Border">
+                                                                                    <Setter Property="CornerRadius" Value="4" />
+                                                                                </Style>
+                                                                            </Button.Resources>
+                                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                                <TextBlock Text="&#xE8E5;" FontFamily="Segoe Fluent Icons" FontSize="11" Margin="0,0,5,0" VerticalAlignment="Center" />
+                                                                                <TextBlock Text="Datei öffnen" VerticalAlignment="Center" />
+                                                                            </StackPanel>
+                                                                        </Button>
+
+                                                                        <!-- Open Folder Button -->
+                                                                        <Button Tag="{Binding}" Click="BtnOpenDownloadFolder_Click"
+                                                                                Padding="8,4"
+                                                                                Background="{StaticResource BgHoverBrush}"
+                                                                                Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                                                                                BorderThickness="0" Cursor="Hand">
+                                                                            <Button.Resources>
+                                                                                <Style TargetType="Border">
+                                                                                    <Setter Property="CornerRadius" Value="4" />
+                                                                                </Style>
+                                                                            </Button.Resources>
+                                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                                <TextBlock Text="&#xE838;" FontFamily="Segoe Fluent Icons" FontSize="11" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                                                                <TextBlock Text="Im Ordner" VerticalAlignment="Center" />
+                                                                            </StackPanel>
+                                                                        </Button>
+                                                                    </StackPanel>
                                                                 </StackPanel>
 
-                                                                <!-- Action buttons -->
-                                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <!-- Action buttons (right side) -->
+                                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top" Margin="0,2,0,0">
                                                                     <!-- Cancel button -->
                                                                     <Button Click="BtnCancelDownload_Click"
                                                                             ToolTip="Abbrechen"
                                                                             Tag="{Binding}"
-                                                                            Width="26" Height="26">
+                                                                            Width="24" Height="24">
                                                                         <Button.Style>
                                                                             <Style TargetType="Button" BasedOn="{StaticResource NavButtonStyle}">
                                                                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -510,43 +608,25 @@
                                                                                 </Style.Triggers>
                                                                             </Style>
                                                                         </Button.Style>
-                                                                        <TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="10" />
+                                                                        <TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="10" Foreground="#EF4444" />
                                                                     </Button>
 
-                                                                    <!-- Open File button -->
-                                                                    <Button Click="BtnOpenDownloadFile_Click"
-                                                                            ToolTip="Datei öffnen"
+                                                                    <!-- Remove / Dismiss button -->
+                                                                    <Button Click="BtnRemoveDownload_Click"
+                                                                            ToolTip="Aus Liste entfernen"
                                                                             Tag="{Binding}"
-                                                                            Width="26" Height="26">
+                                                                            Width="24" Height="24">
                                                                         <Button.Style>
                                                                             <Style TargetType="Button" BasedOn="{StaticResource NavButtonStyle}">
-                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                                <Setter Property="Visibility" Value="Visible" />
                                                                                 <Style.Triggers>
-                                                                                    <DataTrigger Binding="{Binding CanOpen}" Value="True">
-                                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                                    <DataTrigger Binding="{Binding CanCancel}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Collapsed" />
                                                                                     </DataTrigger>
                                                                                 </Style.Triggers>
                                                                             </Style>
                                                                         </Button.Style>
-                                                                        <TextBlock Text="&#xE8E5;" FontFamily="Segoe Fluent Icons" FontSize="11" />
-                                                                    </Button>
-
-                                                                    <!-- Open Folder button -->
-                                                                    <Button Click="BtnOpenDownloadFolder_Click"
-                                                                            ToolTip="Im Ordner anzeigen"
-                                                                            Tag="{Binding}"
-                                                                            Width="26" Height="26">
-                                                                        <Button.Style>
-                                                                            <Style TargetType="Button" BasedOn="{StaticResource NavButtonStyle}">
-                                                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                                                <Style.Triggers>
-                                                                                    <DataTrigger Binding="{Binding CanOpen}" Value="True">
-                                                                                        <Setter Property="Visibility" Value="Visible" />
-                                                                                    </DataTrigger>
-                                                                                </Style.Triggers>
-                                                                            </Style>
-                                                                        </Button.Style>
-                                                                        <TextBlock Text="&#xE838;" FontFamily="Segoe Fluent Icons" FontSize="11" />
+                                                                        <TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
                                                                     </Button>
                                                                 </StackPanel>
                                                             </Grid>

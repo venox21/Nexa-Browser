@@ -71,6 +71,7 @@ namespace Browser.Models
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(ProgressPercent));
                 OnPropertyChanged(nameof(ProgressText));
+                OnPropertyChanged(nameof(StatusText));
             }
         }
 
@@ -83,8 +84,20 @@ namespace Browser.Models
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(ProgressPercent));
                 OnPropertyChanged(nameof(ProgressText));
+                OnPropertyChanged(nameof(StatusText));
             }
         }
+
+        public bool IsInProgress => Status == DownloadStatus.InProgress;
+        public bool IsCompleted => Status == DownloadStatus.Completed;
+        public bool IsInterrupted => Status == DownloadStatus.Interrupted;
+        public bool IsCancelled => Status == DownloadStatus.Cancelled;
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        public System.Windows.Visibility InProgressVisibility => IsInProgress ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        public System.Windows.Visibility CompletedVisibility => IsCompleted ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
 
         public DownloadStatus Status
         {
@@ -96,13 +109,19 @@ namespace Browser.Models
                 OnPropertyChanged(nameof(StatusText));
                 OnPropertyChanged(nameof(CanCancel));
                 OnPropertyChanged(nameof(CanOpen));
+                OnPropertyChanged(nameof(IsInProgress));
+                OnPropertyChanged(nameof(IsCompleted));
+                OnPropertyChanged(nameof(IsInterrupted));
+                OnPropertyChanged(nameof(IsCancelled));
+                OnPropertyChanged(nameof(InProgressVisibility));
+                OnPropertyChanged(nameof(CompletedVisibility));
             }
         }
 
         public string ErrorMessage
         {
             get => _errorMessage;
-            set { _errorMessage = value; OnPropertyChanged(); }
+            set { _errorMessage = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusText)); }
         }
 
         public int ProgressPercent => TotalBytes > 0 ? Math.Clamp((int)((ReceivedBytes * 100) / TotalBytes), 0, 100) : 0;
@@ -119,10 +138,12 @@ namespace Browser.Models
 
         public string StatusText => Status switch
         {
-            DownloadStatus.InProgress => $"{ProgressPercent}% abgeschlossen",
-            DownloadStatus.Completed => "Abgeschlossen",
-            DownloadStatus.Cancelled => "Abgebrochen",
-            DownloadStatus.Interrupted => string.IsNullOrEmpty(ErrorMessage) ? "Fehlgeschlagen" : ErrorMessage,
+            DownloadStatus.InProgress => TotalBytes > 0 
+                ? $"{ProgressPercent}% • {FormatBytes(ReceivedBytes)} / {FormatBytes(TotalBytes)}" 
+                : $"{FormatBytes(ReceivedBytes)} heruntergeladen...",
+            DownloadStatus.Completed => $"✓ Fertig heruntergeladen ({FormatBytes(ReceivedBytes > 0 ? ReceivedBytes : TotalBytes)})",
+            DownloadStatus.Cancelled => "Download abgebrochen",
+            DownloadStatus.Interrupted => string.IsNullOrEmpty(ErrorMessage) ? "Download fehlgeschlagen" : $"Fehlgeschlagen: {ErrorMessage}",
             _ => string.Empty
         };
 

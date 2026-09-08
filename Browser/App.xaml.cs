@@ -40,15 +40,25 @@ namespace Browser
             // 1. Single-Instance & URL check
             var requestedUrl = ExtractUrlFromArgs(e.Args) ?? ExtractUrlFromArgs(Environment.GetCommandLineArgs());
 
-            bool isFirstInstance;
-            _instanceMutex = new Mutex(true, MutexName, out isFirstInstance);
+            bool isFirstInstance = false;
+            try
+            {
+                _instanceMutex = new Mutex(true, MutexName, out isFirstInstance);
+            }
+            catch (AbandonedMutexException)
+            {
+                isFirstInstance = true;
+            }
 
             if (!isFirstInstance)
             {
-                // Another instance is already running: forward URL and exit immediately
-                SendUrlToRunningInstance(requestedUrl ?? "ACTIVATE");
-                Environment.Exit(0);
-                return;
+                // Try forwarding to running instance; if successful, exit immediately.
+                if (SendUrlToRunningInstance(requestedUrl ?? "ACTIVATE"))
+                {
+                    Environment.Exit(0);
+                    return;
+                }
+                // If named pipe server did not answer, the previous process died without releasing mutex.
             }
 
             InitialCommandLineUrl = requestedUrl;
@@ -129,18 +139,22 @@ namespace Browser
             }, token);
         }
 
-        private static void SendUrlToRunningInstance(string message)
+        private static bool SendUrlToRunningInstance(string message)
         {
             try
             {
                 using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
-                client.Connect(1200);
+                client.Connect(350);
 
                 using var writer = new StreamWriter(client, Encoding.UTF8);
                 writer.WriteLine(message);
                 writer.Flush();
+                return true;
             }
-            catch { }
+            catch
+            {
+                return false;
+            }
         }
 
         public static string? ExtractUrlFromArgs(string[]? args)
