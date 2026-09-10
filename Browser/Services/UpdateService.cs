@@ -310,6 +310,7 @@ namespace Browser.Services
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = installerPath,
+                    Arguments = "/silent /launch",
                     UseShellExecute = true
                 });
 

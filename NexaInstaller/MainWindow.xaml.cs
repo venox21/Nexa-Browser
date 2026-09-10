@@ -36,8 +36,8 @@ namespace NexaInstaller
         private string _existingVersion = string.Empty;
         private bool _isUninstallMode = false;
 
-        internal static readonly Version TargetVersion = new Version(2, 0, 1);
-        internal const string TargetVersionDisplay = "2.0.1";
+        internal static readonly Version TargetVersion = new Version(2, 0, 2);
+        internal const string TargetVersionDisplay = "2.0.2";
 
         private List<ImportedBookmark> _detectedBookmarks = new List<ImportedBookmark>();
         private string _onlineReleaseUrl = "https://github.com/venox21/Nexa-Browser/releases";

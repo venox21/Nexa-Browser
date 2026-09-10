@@ -159,6 +159,23 @@ namespace NexaInstaller
                     catch { }
                 }
 
+                // 7. Auto-Launch if requested
+                if (args.Any(a => a.Equals("/launch", StringComparison.OrdinalIgnoreCase) ||
+                                 a.Equals("--launch", StringComparison.OrdinalIgnoreCase) ||
+                                 a.Equals("-launch", StringComparison.OrdinalIgnoreCase)))
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = installedExePath,
+                            WorkingDirectory = targetDir,
+                            UseShellExecute = true
+                        });
+                    }
+                    catch { }
+                }
+
                 return 0; // Success
             }
             catch (Exception ex)
