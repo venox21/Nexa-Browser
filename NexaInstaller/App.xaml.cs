@@ -83,10 +83,23 @@ namespace NexaInstaller
                                              a.Equals("--no-import", StringComparison.OrdinalIgnoreCase) ||
                                              a.Equals("/noimport", StringComparison.OrdinalIgnoreCase));
 
-                // 1. Close running processes
+                // 1. Check Disk Space
+                if (!SystemRequirementService.HasEnoughDiskSpace(targetDir))
+                {
+                    Console.Error.WriteLine("Error: Insufficient disk space (min 250 MB required).");
+                    return 2;
+                }
+
+                // 2. Ensure WebView2 Runtime
+                if (!SystemRequirementService.IsWebView2Installed())
+                {
+                    SystemRequirementService.EnsureWebView2RuntimeAsync().GetAwaiter().GetResult();
+                }
+
+                // 3. Close running processes
                 NexaInstaller.MainWindow.CloseRunningNexaProcesses();
 
-                // 2. Extract embedded app.zip
+                // 4. Extract embedded app.zip
                 Directory.CreateDirectory(targetDir);
                 var assembly = Assembly.GetExecutingAssembly();
                 using (var stream = assembly.GetManifestResourceStream("NexaInstaller.Resources.app.zip"))

@@ -479,11 +479,27 @@ namespace NexaInstaller
 
         private async Task RunUpdateAsync()
         {
+            // 1. Check Disk Space
+            if (!SystemRequirementService.HasEnoughDiskSpace(_targetInstallDir))
+            {
+                throw new IOException("Auf dem Ziellaufwerk ist nicht genügend freier Speicherplatz vorhanden (mindestens 250 MB erforderlich).");
+            }
+
             SetProgress(5, "Aktualisierung wird vorbereitet...", "Schließe laufende Nexa-Instanzen...");
             await Task.Run(CloseRunningNexaProcesses);
-            await Task.Delay(250);
+            await Task.Delay(200);
 
             Directory.CreateDirectory(_targetInstallDir);
+
+            // 2. Ensure Microsoft WebView2 Runtime
+            if (!SystemRequirementService.IsWebView2Installed())
+            {
+                SetProgress(10, "Systemkomponenten einrichten...", "Prüfe Microsoft Edge WebView2...");
+                await SystemRequirementService.EnsureWebView2RuntimeAsync(msg =>
+                {
+                    Dispatcher.Invoke(() => SetProgress(12, "Systemkomponenten einrichten...", msg));
+                });
+            }
 
             SetProgress(15, "Browser-Dateien werden überschrieben...", "Extrahiere neue Dateien...");
             await Task.Delay(200);
@@ -798,13 +814,40 @@ namespace NexaInstaller
 
         private async Task RunInstallationAsync()
         {
+            // 1. Check Windows Version
+            if (!SystemRequirementService.IsSupportedWindowsVersion())
+            {
+                var warn = MessageBox.Show(
+                    "Nexa Browser erfordert Windows 10 (Build 17763+) oder Windows 11.\n\nMöchtest du die Installation trotzdem fortsetzen?",
+                    "Betriebssystem-Warnung",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+                if (warn != MessageBoxResult.Yes) return;
+            }
+
+            // 2. Check Disk Space
+            if (!SystemRequirementService.HasEnoughDiskSpace(_targetInstallDir))
+            {
+                throw new IOException("Auf dem Ziellaufwerk ist nicht genügend freier Speicherplatz vorhanden (mindestens 250 MB erforderlich).");
+            }
+
             SetProgress(5, "Installation wird vorbereitet...", "Schließe laufende Prozesse & erstelle Ordner...");
             await Task.Run(CloseRunningNexaProcesses);
             await Task.Delay(200);
 
             Directory.CreateDirectory(_targetInstallDir);
 
-            // 1. Extract embedded app.zip
+            // 3. Ensure Microsoft WebView2 Runtime
+            if (!SystemRequirementService.IsWebView2Installed())
+            {
+                SetProgress(10, "Systemkomponenten einrichten...", "Prüfe Microsoft Edge WebView2...");
+                await SystemRequirementService.EnsureWebView2RuntimeAsync(msg =>
+                {
+                    Dispatcher.Invoke(() => SetProgress(12, "Systemkomponenten einrichten...", msg));
+                });
+            }
+
+            // 4. Extract embedded app.zip
             SetProgress(15, "Browser-Dateien werden entpackt...", "Lese Archiv...");
             await Task.Delay(200);
 
@@ -942,6 +985,11 @@ namespace NexaInstaller
 
         private void BtnFinish_Click(object sender, RoutedEventArgs e)
         {
+            if (!_isUninstallMode && ChkRegisterDefaultBrowser.IsChecked == true)
+            {
+                SystemRequirementService.OpenDefaultBrowserSettings();
+            }
+
             if (!_isUninstallMode && ChkLaunchFinish.IsChecked == true && File.Exists(_installedExePath))
             {
                 try
