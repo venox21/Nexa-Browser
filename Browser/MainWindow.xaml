@@ -786,6 +786,422 @@
                             </Popup>
                         </Grid>
 
+                        <!-- Logins & Passwords button with Badge & Flyout -->
+                        <Grid Margin="4,0,0,0">
+                            <Button x:Name="BtnLogins"
+                                    Click="BtnLogins_Click"
+                                    ToolTip="Gespeicherte Logins &amp; Passwörter"
+                                    Style="{StaticResource NavButtonStyle}">
+                                <TextBlock Text="&#xE8D7;"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="14" />
+                            </Button>
+                            <!-- Logins matching badge -->
+                            <Border x:Name="LoginsBadge"
+                                    Background="{StaticResource AccentPrimaryBrush}"
+                                    CornerRadius="6"
+                                    MinWidth="14" Height="14"
+                                    Padding="3,0"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Top"
+                                    Margin="0,2,2,0"
+                                    IsHitTestVisible="False"
+                                    Visibility="Collapsed">
+                                <TextBlock x:Name="LoginsBadgeCount"
+                                           Text="0"
+                                           FontSize="9"
+                                           FontWeight="SemiBold"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" />
+                            </Border>
+
+                            <!-- Logins Flyout Popup -->
+                            <Popup x:Name="LoginsPopup"
+                                   PlacementTarget="{Binding ElementName=BtnLogins}"
+                                   Placement="Bottom"
+                                   AllowsTransparency="True"
+                                   StaysOpen="False"
+                                   VerticalOffset="6"
+                                   HorizontalOffset="-320">
+                                <Border Background="{StaticResource BgSurfaceBrush}"
+                                        BorderBrush="{StaticResource BorderDefaultBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="12"
+                                        Width="380"
+                                        MaxHeight="520"
+                                        Padding="0">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="18" Direction="270" Opacity="0.5" ShadowDepth="4" Color="#000000" />
+                                    </Border.Effect>
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Header -->
+                                        <Border Grid.Row="0"
+                                                BorderThickness="0,0,0,1"
+                                                BorderBrush="{StaticResource BorderSubtleBrush}"
+                                                Padding="14,10">
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Right"
+                                                        Content="Tresor öffnen ⚙️"
+                                                        Click="BtnOpenVaultFromPopup_Click"
+                                                        Foreground="{DynamicResource AccentLightBrush}"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        FontSize="11"
+                                                        FontWeight="SemiBold"
+                                                        Cursor="Hand" />
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="&#xE8D7;"
+                                                               FontFamily="Segoe Fluent Icons"
+                                                               FontSize="13"
+                                                               Foreground="{DynamicResource AccentLightBrush}"
+                                                               Margin="0,0,6,0"
+                                                               VerticalAlignment="Center" />
+                                                    <TextBlock Text="Passwörter &amp; Logins"
+                                                               FontWeight="Bold"
+                                                               FontSize="13"
+                                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                                               VerticalAlignment="Center" />
+                                                    <Border Background="{StaticResource BgElevatedBrush}"
+                                                            CornerRadius="4"
+                                                            Padding="5,1"
+                                                            Margin="8,0,0,0"
+                                                            VerticalAlignment="Center">
+                                                        <TextBlock x:Name="TxtLoginsTotalCount"
+                                                                   Text="0 gespeichert"
+                                                                   FontSize="10"
+                                                                   Foreground="{StaticResource TextMutedBrush}" />
+                                                    </Border>
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+
+                                        <!-- Search input -->
+                                        <Border Grid.Row="1"
+                                                Margin="12,10,12,6"
+                                                Background="{StaticResource BgElevatedBrush}"
+                                                BorderBrush="{StaticResource BorderSubtleBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="8"
+                                                Padding="8,5">
+                                            <DockPanel>
+                                                <TextBlock DockPanel.Dock="Left"
+                                                           Text="&#xE721;"
+                                                           FontFamily="Segoe Fluent Icons"
+                                                           FontSize="12"
+                                                           Foreground="{StaticResource TextMutedBrush}"
+                                                           VerticalAlignment="Center"
+                                                           Margin="0,0,6,0" />
+                                                <TextBox x:Name="LoginsSearchBox"
+                                                         TextChanged="LoginsSearchBox_TextChanged"
+                                                         Background="Transparent"
+                                                         BorderThickness="0"
+                                                         Foreground="{StaticResource TextPrimaryBrush}"
+                                                         FontSize="12"
+                                                         CaretBrush="{DynamicResource AccentLightBrush}" />
+                                            </DockPanel>
+                                        </Border>
+
+                                        <!-- Scrollable Content -->
+                                        <ScrollViewer Grid.Row="2"
+                                                      VerticalScrollBarVisibility="Auto"
+                                                      HorizontalScrollBarVisibility="Disabled"
+                                                      Padding="10,4,10,4">
+                                            <StackPanel>
+                                                <!-- Section 1: For this website -->
+                                                <Border x:Name="CurrentSiteSection" Margin="0,0,0,10">
+                                                    <StackPanel>
+                                                        <DockPanel Margin="2,0,2,6">
+                                                            <TextBlock Text="PASSEND ZUR WEBSITE"
+                                                                       FontSize="10"
+                                                                       FontWeight="Bold"
+                                                                       Foreground="{StaticResource TextMutedBrush}" />
+                                                            <TextBlock x:Name="TxtCurrentSiteHost"
+                                                                       Text=""
+                                                                       FontSize="10"
+                                                                       Foreground="{DynamicResource AccentLightBrush}"
+                                                                       HorizontalAlignment="Right"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       MaxWidth="180" />
+                                                        </DockPanel>
+
+                                                        <!-- Matching items list -->
+                                                        <ItemsControl x:Name="CurrentSiteLoginsList">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Border Background="{StaticResource BgElevatedBrush}"
+                                                                            BorderBrush="{StaticResource BorderSubtleBrush}"
+                                                                            BorderThickness="1"
+                                                                            CornerRadius="8"
+                                                                            Padding="10,8"
+                                                                            Margin="0,0,0,6"
+                                                                            Cursor="Hand"
+                                                                            MouseLeftButtonDown="LoginCard_MouseLeftButtonDown">
+                                                                        <Border.Style>
+                                                                            <Style TargetType="Border">
+                                                                                <Style.Triggers>
+                                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                                        <Setter Property="Background" Value="{StaticResource BgHoverBrush}" />
+                                                                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentDimBrush}" />
+                                                                                    </Trigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Border.Style>
+                                                                        <Grid>
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="Auto" />
+                                                                                <ColumnDefinition Width="*" />
+                                                                                <ColumnDefinition Width="Auto" />
+                                                                            </Grid.ColumnDefinitions>
+
+                                                                            <!-- User Avatar / Icon -->
+                                                                            <Border Grid.Column="0"
+                                                                                    Width="32" Height="32"
+                                                                                    CornerRadius="16"
+                                                                                    Background="{DynamicResource AccentDimBrush}"
+                                                                                    Margin="0,0,10,0"
+                                                                                    VerticalAlignment="Center">
+                                                                                <TextBlock Text="&#xE77B;"
+                                                                                           FontFamily="Segoe Fluent Icons"
+                                                                                           FontSize="14"
+                                                                                           Foreground="{DynamicResource AccentLightBrush}"
+                                                                                           HorizontalAlignment="Center"
+                                                                                           VerticalAlignment="Center" />
+                                                                            </Border>
+
+                                                                            <!-- Username and Masked Password -->
+                                                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                                                <TextBlock Text="{Binding Username}"
+                                                                                           FontWeight="SemiBold"
+                                                                                           FontSize="12.5"
+                                                                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                                                                           TextTrimming="CharacterEllipsis" />
+                                                                                <TextBlock Text="{Binding PasswordLengthMask}"
+                                                                                           FontSize="11"
+                                                                                           Foreground="{StaticResource TextMutedBrush}"
+                                                                                           Margin="0,2,0,0" />
+                                                                            </StackPanel>
+
+                                                                            <!-- Action Buttons -->
+                                                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                                <!-- Copy Password -->
+                                                                                <Button Click="BtnCopyPassword_Click"
+                                                                                        Tag="{Binding}"
+                                                                                        ToolTip="Passwort kopieren"
+                                                                                        Width="26" Height="26"
+                                                                                        Background="Transparent"
+                                                                                        BorderThickness="0"
+                                                                                        Cursor="Hand"
+                                                                                        Margin="0,0,4,0">
+                                                                                    <TextBlock Text="&#xE8C8;"
+                                                                                               FontFamily="Segoe Fluent Icons"
+                                                                                               FontSize="11"
+                                                                                               Foreground="{StaticResource TextMutedBrush}" />
+                                                                                </Button>
+                                                                                <!-- Autofill Button -->
+                                                                                <Button Click="BtnAutofillEntry_Click"
+                                                                                        Tag="{Binding}"
+                                                                                        ToolTip="In diese Seite einsetzen"
+                                                                                        Background="{DynamicResource AccentPrimaryBrush}"
+                                                                                        Foreground="White"
+                                                                                        FontWeight="SemiBold"
+                                                                                        FontSize="11"
+                                                                                        Padding="10,4"
+                                                                                        BorderThickness="0"
+                                                                                        Cursor="Hand">
+                                                                                    <Button.Resources>
+                                                                                        <Style TargetType="Border">
+                                                                                            <Setter Property="CornerRadius" Value="6" />
+                                                                                        </Style>
+                                                                                    </Button.Resources>
+                                                                                    <StackPanel Orientation="Horizontal">
+                                                                                        <TextBlock Text="&#xE8D7;" FontFamily="Segoe Fluent Icons" FontSize="10" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                                                                        <TextBlock Text="Einsetzen" VerticalAlignment="Center" />
+                                                                                    </StackPanel>
+                                                                                </Button>
+                                                                            </StackPanel>
+                                                                        </Grid>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+
+                                                        <!-- No matching logins for current site card -->
+                                                        <Border x:Name="BorderNoCurrentSiteLogins"
+                                                                Background="{StaticResource BgElevatedBrush}"
+                                                                CornerRadius="8"
+                                                                Padding="10,8"
+                                                                Visibility="Collapsed">
+                                                            <TextBlock Text="Kein Login für diese Seite gespeichert"
+                                                                       FontSize="11"
+                                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                                       VerticalAlignment="Center" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <!-- Section 2: All Logins Header -->
+                                                <DockPanel Margin="2,4,2,6">
+                                                    <TextBlock Text="ALLE GESPEICHERTEN LOGINS"
+                                                               FontSize="10"
+                                                               FontWeight="Bold"
+                                                               Foreground="{StaticResource TextMutedBrush}" />
+                                                </DockPanel>
+
+                                                <!-- All Logins List -->
+                                                <ItemsControl x:Name="AllLoginsList">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border CornerRadius="6"
+                                                                    Padding="8,6"
+                                                                    Margin="0,0,0,2"
+                                                                    Cursor="Hand"
+                                                                    Background="Transparent"
+                                                                    MouseLeftButtonDown="LoginCard_MouseLeftButtonDown">
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border">
+                                                                        <Style.Triggers>
+                                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                                <Setter Property="Background" Value="{StaticResource BgHoverBrush}" />
+                                                                            </Trigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Border.Style>
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="28" />
+                                                                        <ColumnDefinition Width="*" />
+                                                                        <ColumnDefinition Width="Auto" />
+                                                                    </Grid.ColumnDefinitions>
+
+                                                                    <!-- Globe / Website Icon -->
+                                                                    <TextBlock Grid.Column="0"
+                                                                               Text="&#xE774;"
+                                                                               FontFamily="Segoe Fluent Icons"
+                                                                               FontSize="13"
+                                                                               Foreground="{StaticResource TextMutedBrush}"
+                                                                               VerticalAlignment="Center"
+                                                                               HorizontalAlignment="Left" />
+
+                                                                    <!-- Site Title & Username -->
+                                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,6,0">
+                                                                        <TextBlock Text="{Binding Title}"
+                                                                                   FontWeight="SemiBold"
+                                                                                   FontSize="12"
+                                                                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                                                                   TextTrimming="CharacterEllipsis" />
+                                                                        <TextBlock Text="{Binding Username}"
+                                                                                   FontSize="11"
+                                                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                                                   TextTrimming="CharacterEllipsis" />
+                                                                    </StackPanel>
+
+                                                                    <!-- Quick actions -->
+                                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                        <!-- Copy Username -->
+                                                                        <Button Click="BtnCopyUsername_Click"
+                                                                                Tag="{Binding}"
+                                                                                ToolTip="Benutzername kopieren"
+                                                                                Width="24" Height="24"
+                                                                                Background="Transparent"
+                                                                                BorderThickness="0"
+                                                                                Cursor="Hand">
+                                                                            <TextBlock Text="&#xE77B;"
+                                                                                       FontFamily="Segoe Fluent Icons"
+                                                                                       FontSize="10"
+                                                                                       Foreground="{StaticResource TextMutedBrush}" />
+                                                                        </Button>
+                                                                        <!-- Copy Password -->
+                                                                        <Button Click="BtnCopyPassword_Click"
+                                                                                Tag="{Binding}"
+                                                                                ToolTip="Passwort kopieren"
+                                                                                Width="24" Height="24"
+                                                                                Background="Transparent"
+                                                                                BorderThickness="0"
+                                                                                Cursor="Hand"
+                                                                                Margin="2,0,4,0">
+                                                                            <TextBlock Text="&#xE8C8;"
+                                                                                       FontFamily="Segoe Fluent Icons"
+                                                                                       FontSize="10"
+                                                                                       Foreground="{StaticResource TextMutedBrush}" />
+                                                                        </Button>
+                                                                        <!-- Autofill Button -->
+                                                                        <Button Click="BtnAutofillEntry_Click"
+                                                                                Tag="{Binding}"
+                                                                                ToolTip="In Seite einsetzen"
+                                                                                Background="{StaticResource BgHoverBrush}"
+                                                                                Foreground="{StaticResource TextPrimaryBrush}"
+                                                                                FontSize="10.5"
+                                                                                FontWeight="SemiBold"
+                                                                                Padding="8,3"
+                                                                                BorderBrush="{StaticResource BorderSubtleBrush}"
+                                                                                BorderThickness="1"
+                                                                                Cursor="Hand">
+                                                                            <Button.Resources>
+                                                                                <Style TargetType="Border">
+                                                                                    <Setter Property="CornerRadius" Value="4" />
+                                                                                </Style>
+                                                                            </Button.Resources>
+                                                                            <TextBlock Text="Einsetzen" />
+                                                                        </Button>
+                                                                    </StackPanel>
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+
+                                                <!-- No results found for search -->
+                                                <Border x:Name="BorderVaultSearchEmpty"
+                                                        Padding="12,16"
+                                                        HorizontalAlignment="Center"
+                                                        Visibility="Collapsed">
+                                                    <TextBlock Text="Keine passenden Logins gefunden"
+                                                               FontSize="11"
+                                                               Foreground="{StaticResource TextMutedBrush}" />
+                                                </Border>
+                                            </StackPanel>
+                                        </ScrollViewer>
+
+                                        <!-- Footer -->
+                                        <Border Grid.Row="3"
+                                                BorderThickness="0,1,0,0"
+                                                BorderBrush="{StaticResource BorderSubtleBrush}"
+                                                Background="{StaticResource BgBaseBrush}"
+                                                Padding="12,8">
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Left"
+                                                        Click="BtnAddPasswordFromPopup_Click"
+                                                        Content="➕ Neues Passwort"
+                                                        Background="Transparent"
+                                                        Foreground="{DynamicResource AccentLightBrush}"
+                                                        BorderThickness="0"
+                                                        FontSize="11"
+                                                        FontWeight="SemiBold"
+                                                        Cursor="Hand" />
+                                                <Button DockPanel.Dock="Right"
+                                                        Click="BtnOpenVaultFromPopup_Click"
+                                                        Content="Passwort-Manager öffnen"
+                                                        Background="Transparent"
+                                                        Foreground="{StaticResource TextMutedBrush}"
+                                                        BorderThickness="0"
+                                                        FontSize="11"
+                                                        Cursor="Hand"
+                                                        HorizontalAlignment="Right" />
+                                            </DockPanel>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </Popup>
+                        </Grid>
+
                         <!-- AdBlocker button in right toolbar -->
                         <Grid Margin="4,0,0,0">
                             <Button x:Name="BtnToolbarAdBlock"
@@ -1345,6 +1761,22 @@
                                                Foreground="{StaticResource TextSecondaryBrush}" />
                                 </Button>
 
+                                <!-- Logins / Autofill key button in Omnibox -->
+                                <Button x:Name="BtnOmniboxLogins"
+                                        Click="BtnOmniboxLogins_Click"
+                                        ToolTip="Gespeicherte Logins für diese Seite anzeigen &amp; einsetzen"
+                                        Width="26" Height="26"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Cursor="Hand"
+                                        Margin="0,0,2,0"
+                                        Visibility="Collapsed">
+                                    <TextBlock Text="&#xE8D7;"
+                                               FontFamily="Segoe Fluent Icons"
+                                               FontSize="13"
+                                               Foreground="{DynamicResource AccentLightBrush}" />
+                                </Button>
+
                                 <!-- Bookmark star button -->
                                 <Button x:Name="BtnBookmarkStar"
                                         Click="BtnBookmarkStar_Click"
@@ -1740,6 +2172,37 @@
 
                     <!-- In-Place Banners Host (Airspace Safe) -->
                     <StackPanel Grid.Row="0">
+                        <!-- In-Place Autofill Feedback Banner (Airspace Safe) -->
+                        <Border x:Name="AutofillBanner"
+                                VerticalAlignment="Top"
+                                HorizontalAlignment="Stretch"
+                                Background="#1A10B981"
+                                BorderBrush="#6010B981"
+                                BorderThickness="0,0,0,1"
+                                Padding="14,8"
+                                Visibility="Collapsed">
+                            <DockPanel LastChildFill="True">
+                                <Button x:Name="BtnCloseAutofillBanner"
+                                        DockPanel.Dock="Right"
+                                        Click="BtnCloseAutofillBanner_Click"
+                                        Style="{StaticResource TabCloseButtonStyle}"
+                                        ToolTip="Schließen">
+                                    <TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="10" />
+                                </Button>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Background="#2510B981" CornerRadius="4" Padding="5,3" Margin="0,0,8,0">
+                                        <TextBlock Text="&#xE8D7;" FontFamily="Segoe Fluent Icons" FontSize="12" Foreground="#FF10B981" VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock x:Name="TxtAutofillBannerMsg"
+                                               Text="✓ Login-Daten erfolgreich eingesetzt"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
                         <!-- In-Place Translation Bar Overlay -->
                         <Border x:Name="TranslationBanner"
                                 VerticalAlignment="Top"

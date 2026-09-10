@@ -473,8 +473,8 @@ namespace Browser.Services
 
         public static string GetAutofillScript(string username, string password)
         {
-            var userJson = JsonSerializer.Serialize(username);
-            var passJson = JsonSerializer.Serialize(password);
+            var userJson = JsonSerializer.Serialize(username ?? string.Empty);
+            var passJson = JsonSerializer.Serialize(password ?? string.Empty);
 
             return $@"
 (() => {{
@@ -482,45 +482,108 @@ namespace Browser.Services
         const userVal = {userJson};
         const passVal = {passJson};
 
-        const pwdInputs = document.querySelectorAll('input[type=""password""]');
-        if (pwdInputs.length === 0) return false;
+        // Helper to set values in native DOM, React 16+, Vue, Angular, etc.
+        function setInputValue(el, val) {{
+            if (!el) return;
+            try {{
+                el.focus();
+                const prototype = window.HTMLInputElement.prototype;
+                const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+                if (descriptor && descriptor.set) {{
+                    descriptor.set.call(el, val);
+                }} else {{
+                    el.value = val;
+                }}
+            }} catch(e) {{
+                el.value = val;
+            }}
 
-        const pwdInput = pwdInputs[0];
-        const form = pwdInput.form || document;
-        const inputs = Array.from(form.querySelectorAll('input:not([type=""hidden""])'));
-        const pwdIndex = inputs.indexOf(pwdInput);
+            try {{
+                el.dispatchEvent(new Event('focus', {{ bubbles: true }}));
+                el.dispatchEvent(new Event('input', {{ bubbles: true, cancelable: true }}));
+                el.dispatchEvent(new Event('change', {{ bubbles: true, cancelable: true }}));
+                el.dispatchEvent(new KeyboardEvent('keydown', {{ bubbles: true, cancelable: true, key: 'a' }}));
+                el.dispatchEvent(new KeyboardEvent('keyup', {{ bubbles: true, cancelable: true, key: 'a' }}));
+                el.dispatchEvent(new Event('blur', {{ bubbles: true }}));
+            }} catch(e) {{}}
+        }}
 
+        // Helper to check if element is visible
+        function isVisible(el) {{
+            if (!el) return false;
+            try {{
+                const style = window.getComputedStyle(el);
+                return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0' && (el.offsetWidth > 0 || el.offsetHeight > 0 || el.getClientRects().length > 0);
+            }} catch(e) {{
+                return true;
+            }}
+        }}
+
+        // 1. Locate Password Input
+        const allPwdInputs = Array.from(document.querySelectorAll('input[type=""password""]:not([disabled])'));
+        let pwdInput = allPwdInputs.find(isVisible) || allPwdInputs[0] || null;
+
+        // 2. Locate Username / Email Input
         let userInput = null;
-        if (pwdIndex > 0) {{
-            for (let i = pwdIndex - 1; i >= 0; i--) {{
-                const inp = inputs[i];
-                const type = (inp.type || 'text').toLowerCase();
-                if (type === 'text' || type === 'email' || type === 'tel') {{
-                    userInput = inp;
-                    break;
+        if (pwdInput) {{
+            // Look for predecessor input in same form or document
+            const form = pwdInput.form || pwdInput.closest('form') || document;
+            const inputs = Array.from(form.querySelectorAll('input:not([type=""hidden""]):not([type=""submit""]):not([type=""button""]):not([disabled])'));
+            const pwdIdx = inputs.indexOf(pwdInput);
+            if (pwdIdx > 0) {{
+                for (let i = pwdIdx - 1; i >= 0; i--) {{
+                    const inp = inputs[i];
+                    const t = (inp.type || 'text').toLowerCase();
+                    if (t === 'text' || t === 'email' || t === 'tel') {{
+                        userInput = inp;
+                        break;
+                    }}
                 }}
             }}
         }}
 
-        function fireEvents(el, val) {{
-            el.focus();
-            el.value = val;
-            el.dispatchEvent(new Event('input', {{ bubbles: true }}));
-            el.dispatchEvent(new Event('change', {{ bubbles: true }}));
-            el.blur();
+        if (!userInput) {{
+            // Attribute-based search for username / email
+            const candidates = Array.from(document.querySelectorAll(
+                'input[autocomplete=""username"" i]:not([disabled]), ' +
+                'input[autocomplete=""email"" i]:not([disabled]), ' +
+                'input[name*=""user"" i]:not([disabled]), ' +
+                'input[name*=""login"" i]:not([disabled]), ' +
+                'input[name*=""email"" i]:not([disabled]), ' +
+                'input[id*=""user"" i]:not([disabled]), ' +
+                'input[id*=""login"" i]:not([disabled]), ' +
+                'input[id*=""email"" i]:not([disabled]), ' +
+                'input[type=""email""]:not([disabled])'
+            ));
+            userInput = candidates.find(isVisible) || candidates[0] || null;
         }}
 
+        if (!userInput && !pwdInput) {{
+            // Fallback: any visible text input
+            const textInputs = Array.from(document.querySelectorAll('input[type=""text""]:not([disabled]), input:not([type]):not([disabled])'));
+            userInput = textInputs.find(isVisible) || textInputs[0] || null;
+        }}
+
+        let filledUser = false;
+        let filledPass = false;
+
         if (userInput && userVal) {{
-            fireEvents(userInput, userVal);
+            setInputValue(userInput, userVal);
+            filledUser = true;
         }}
 
         if (pwdInput && passVal) {{
-            fireEvents(pwdInput, passVal);
+            setInputValue(pwdInput, passVal);
+            filledPass = true;
         }}
 
-        return true;
+        return JSON.stringify({{
+            success: filledUser || filledPass,
+            filledUser: filledUser,
+            filledPass: filledPass
+        }});
     }} catch(e) {{
-        return false;
+        return JSON.stringify({{ success: false, error: e.toString() }});
     }}
 }})();";
         }

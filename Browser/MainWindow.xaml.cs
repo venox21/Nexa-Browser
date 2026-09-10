@@ -62,6 +62,8 @@ namespace Browser
             DownloadManager.Instance.DownloadCompleted += OnDownloadCompleted;
             UpdateDownloadBadge();
 
+            PasswordService.Instance.PasswordsChanged += () => Dispatcher.InvokeAsync(UpdateLoginsIndicator);
+
             HistoryList.ItemsSource = HistoryService.Instance.History;
             BookmarksList.ItemsSource = BookmarkService.Instance.Bookmarks;
             BookmarksOverflowList.ItemsSource = BookmarkService.Instance.Bookmarks;
@@ -720,6 +722,7 @@ namespace Browser
             UpdateBookmarkStar();
             UpdateShieldUI();
             UpdateSecurityIcon(tab.Url);
+            UpdateLoginsIndicator();
 
             if (tab.IsLoading)
                 StartLoadingProgress();
@@ -1176,6 +1179,7 @@ namespace Browser
                                 var best = creds[0];
                                 await tab.WebView.CoreWebView2.ExecuteScriptAsync(PasswordService.GetAutofillScript(best.Username, best.Password));
                             }
+                            UpdateLoginsIndicator();
 
                             // Nexa Speed Engine: Extract link hostnames from page and batch-prefetch DNS
                             _ = Task.Run(async () =>
@@ -3154,6 +3158,265 @@ namespace Browser
 
             var tab = _tabManager.AddTab("about:sync");
             ShowSettingsInTab(tab, "Sync");
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // Passwörter & Login-Manager Popup & Autofill
+        // ══════════════════════════════════════════════════════════════
+
+        private DispatcherTimer? _autofillBannerTimer;
+
+        private void BtnLogins_Click(object sender, RoutedEventArgs e)
+        {
+            LoginsPopup.PlacementTarget = BtnLogins;
+            LoginsPopup.HorizontalOffset = -320;
+            OpenLoginsPopup();
+        }
+
+        private void BtnOmniboxLogins_Click(object sender, RoutedEventArgs e)
+        {
+            LoginsPopup.PlacementTarget = BtnOmniboxLogins;
+            LoginsPopup.HorizontalOffset = -280;
+            OpenLoginsPopup();
+        }
+
+        private void OpenLoginsPopup()
+        {
+            LoginsSearchBox.Text = string.Empty;
+            PopulateLoginsPopup();
+            LoginsPopup.IsOpen = true;
+            Dispatcher.InvokeAsync(() =>
+            {
+                LoginsSearchBox.Focus();
+            }, DispatcherPriority.Input);
+        }
+
+        private void PopulateLoginsPopup(string filter = "")
+        {
+            var activeTab = _tabManager.ActiveTab;
+            var currentUrl = activeTab?.Url;
+            string currentHost = string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(currentUrl) &&
+                (currentUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                 currentUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+            {
+                try
+                {
+                    if (Uri.TryCreate(currentUrl, UriKind.Absolute, out var uri))
+                    {
+                        currentHost = uri.Host;
+                    }
+                }
+                catch { }
+            }
+
+            // 1. Passend zur aktuellen Website
+            if (!string.IsNullOrEmpty(currentHost))
+            {
+                CurrentSiteSection.Visibility = Visibility.Visible;
+                TxtCurrentSiteHost.Text = currentHost;
+
+                var matching = PasswordService.Instance.GetMatchingCredentials(currentUrl);
+                if (!string.IsNullOrWhiteSpace(filter))
+                {
+                    var q = filter.Trim();
+                    matching = matching.Where(p =>
+                        p.Title.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                        p.Host.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                        p.Username.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
+                }
+
+                CurrentSiteLoginsList.ItemsSource = matching;
+                BorderNoCurrentSiteLogins.Visibility = matching.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
+            else
+            {
+                CurrentSiteSection.Visibility = Visibility.Collapsed;
+            }
+
+            // 2. Alle gespeicherten Logins
+            var all = PasswordService.Instance.Passwords.ToList();
+            if (!string.IsNullOrWhiteSpace(filter))
+            {
+                var q = filter.Trim();
+                all = all.Where(p =>
+                    p.Title.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                    p.Host.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                    p.Username.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                    p.Url.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+
+            var ordered = all.OrderBy(p => p.Title).ToList();
+            AllLoginsList.ItemsSource = ordered;
+            BorderVaultSearchEmpty.Visibility = (ordered.Count == 0 && !string.IsNullOrWhiteSpace(filter))
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            TxtLoginsTotalCount.Text = $"{PasswordService.Instance.Passwords.Count} gespeichert";
+        }
+
+        private void LoginsSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            PopulateLoginsPopup(LoginsSearchBox.Text?.Trim() ?? string.Empty);
+        }
+
+        private void LoginCard_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.OriginalSource is Button || (e.OriginalSource is TextBlock tb && tb.TemplatedParent is Button))
+                return;
+
+            var entry = (sender as FrameworkElement)?.DataContext as PasswordEntry;
+            if (entry != null)
+            {
+                _ = AutofillCredentialsAsync(entry);
+            }
+        }
+
+        private void BtnAutofillEntry_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            var entry = ((sender as FrameworkElement)?.Tag as PasswordEntry) ??
+                        ((sender as FrameworkElement)?.DataContext as PasswordEntry);
+            if (entry != null)
+            {
+                _ = AutofillCredentialsAsync(entry);
+            }
+        }
+
+        private async Task AutofillCredentialsAsync(PasswordEntry entry)
+        {
+            LoginsPopup.IsOpen = false;
+
+            var activeTab = _tabManager.ActiveTab;
+            if (activeTab?.WebView?.CoreWebView2 != null)
+            {
+                try
+                {
+                    var script = PasswordService.GetAutofillScript(entry.Username, entry.Password);
+                    var result = await activeTab.WebView.CoreWebView2.ExecuteScriptAsync(script);
+
+                    bool success = true;
+                    if (!string.IsNullOrEmpty(result) && result != "null")
+                    {
+                        try
+                        {
+                            using var doc = System.Text.Json.JsonDocument.Parse(result.Trim('"').Replace("\\\"", "\""));
+                            if (doc.RootElement.TryGetProperty("success", out var succProp))
+                            {
+                                success = succProp.GetBoolean();
+                            }
+                        }
+                        catch { }
+                    }
+
+                    if (success)
+                    {
+                        ShowAutofillBanner($"✓ Login für '{entry.Username}' erfolgreich auf der Seite eingesetzt.");
+                    }
+                    else
+                    {
+                        try { Clipboard.SetText(entry.Password); } catch { }
+                        ShowAutofillBanner($"⚠️ Kein Login-Feld gefunden – Passwort für '{entry.Username}' wurde in Zwischenablage kopiert.");
+                    }
+                }
+                catch
+                {
+                    try { Clipboard.SetText(entry.Password); } catch { }
+                    ShowAutofillBanner($"✓ Passwort für '{entry.Username}' in Zwischenablage kopiert.");
+                }
+            }
+            else
+            {
+                try { Clipboard.SetText(entry.Password); } catch { }
+                ShowAutofillBanner($"✓ Passwort für '{entry.Username}' in Zwischenablage kopiert.");
+            }
+        }
+
+        private void BtnCopyUsername_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            var entry = ((sender as FrameworkElement)?.Tag as PasswordEntry) ??
+                        ((sender as FrameworkElement)?.DataContext as PasswordEntry);
+            if (entry != null && !string.IsNullOrEmpty(entry.Username))
+            {
+                try
+                {
+                    Clipboard.SetText(entry.Username);
+                    ShowAutofillBanner($"✓ Benutzername '{entry.Username}' in Zwischenablage kopiert.");
+                }
+                catch { }
+            }
+        }
+
+        private void BtnCopyPassword_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            var entry = ((sender as FrameworkElement)?.Tag as PasswordEntry) ??
+                        ((sender as FrameworkElement)?.DataContext as PasswordEntry);
+            if (entry != null && !string.IsNullOrEmpty(entry.Password))
+            {
+                try
+                {
+                    Clipboard.SetText(entry.Password);
+                    ShowAutofillBanner($"✓ Passwort für '{entry.Title}' in Zwischenablage kopiert.");
+                }
+                catch { }
+            }
+        }
+
+        private void BtnOpenVaultFromPopup_Click(object sender, RoutedEventArgs e)
+        {
+            LoginsPopup.IsOpen = false;
+            OpenPasswordVault();
+        }
+
+        private void BtnAddPasswordFromPopup_Click(object sender, RoutedEventArgs e)
+        {
+            LoginsPopup.IsOpen = false;
+            OpenPasswordVault();
+        }
+
+        private void ShowAutofillBanner(string message)
+        {
+            TxtAutofillBannerMsg.Text = message;
+            AutofillBanner.Visibility = Visibility.Visible;
+
+            _autofillBannerTimer?.Stop();
+            _autofillBannerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3.5) };
+            _autofillBannerTimer.Tick += (s, ev) =>
+            {
+                _autofillBannerTimer?.Stop();
+                AutofillBanner.Visibility = Visibility.Collapsed;
+            };
+            _autofillBannerTimer.Start();
+        }
+
+        private void BtnCloseAutofillBanner_Click(object sender, RoutedEventArgs e)
+        {
+            _autofillBannerTimer?.Stop();
+            AutofillBanner.Visibility = Visibility.Collapsed;
+        }
+
+        private void UpdateLoginsIndicator()
+        {
+            var tab = _tabManager.ActiveTab;
+            if (tab != null && !string.IsNullOrEmpty(tab.Url) &&
+                (tab.Url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                 tab.Url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+            {
+                var matches = PasswordService.Instance.GetMatchingCredentials(tab.Url);
+                if (matches.Count > 0)
+                {
+                    BtnOmniboxLogins.Visibility = Visibility.Visible;
+                    LoginsBadge.Visibility = Visibility.Visible;
+                    LoginsBadgeCount.Text = matches.Count > 9 ? "9+" : matches.Count.ToString();
+                    return;
+                }
+            }
+
+            BtnOmniboxLogins.Visibility = Visibility.Collapsed;
+            LoginsBadge.Visibility = Visibility.Collapsed;
         }
 
         private async void TogglePictureInPictureAsync()
