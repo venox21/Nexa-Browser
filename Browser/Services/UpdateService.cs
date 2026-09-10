@@ -88,7 +88,7 @@ namespace Browser.Services
         private static readonly Lazy<UpdateService> _lazyInstance = new(() => new UpdateService());
         public static UpdateService Instance => _lazyInstance.Value;
 
-        private const string PrimaryVersionManifestUrl = "https://raw.githubusercontent.com/venox21/Nexa-Browser/main/version.json";
+        private const string PrimaryVersionManifestUrl = "https://raw.githubusercontent.com/venox21/Nexa-Browser/refs/heads/main/version.json";
         private const string GitHubApiReleasesUrl = "https://api.github.com/repos/venox21/Nexa-Browser/releases?per_page=5";
 
         private readonly HttpClient _httpClient;
