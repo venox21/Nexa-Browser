@@ -1,17 +1,16 @@
 {
   "version": "2.0.2",
   "display_version": "v2.0.2",
-  "release_name": "Nexa Browser v2.0.2 – Download Manager & Updater Patch",
-  "release_date": "2026-09-08",
-  "download_url": "https://github.com/venox21/Nexa-Browser/releases/latest/download/NexaSetup.exe",
+  "release_name": "Nexa Browser v2.0.2 – Live GitHub Updater & Bugfixes",
+  "release_date": "2026-09-10",
+  "download_url": "https://github.com/venox21/Nexa-Browser/releases/download/Installer/NexaSetup.exe",
   "raw_setup_url": "https://github.com/venox21/Nexa-Browser/raw/main/NexaSetup.exe",
   "repository_url": "https://github.com/venox21/Nexa-Browser",
   "min_os_version": "Windows 10 / Windows 11 (64-Bit)",
   "changelog": [
-    "📥 Neuer Download-Manager mit flüssigem Fortschrittsbalken & Sofort-Start-Buttons",
-    "🔔 Akustische und visuelle Fertigmeldung bei abgeschlossenen Downloads",
-    "🛡️ Behebung des Einfrierens bei Sicherheitsfreigaben ('Trotzdem behalten')",
-    "🔄 Direkte Aktualisierungs-Funktion im Installer ('Jetzt aktualisieren')",
-    "⚡ Turbo-DNS Prefetching, Instant-Cache & Shield Pro AdBlocker"
+    "🚀 Direkte GitHub-Repository & Releases Live-Prüfung im Updater",
+    "⚡ Sofortige Erkennung neuer Releases ohne Cache-Verzögerung",
+    "⚙️ Reale Update-Prüfung in den Einstellungen mit Zeitstempel",
+    "🛡️ Verbesserte Fehlerbehandlung bei Offline- und Verbindungsproblemen"
   ]
 }

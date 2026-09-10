@@ -308,20 +308,15 @@ namespace Browser.Views
 
         private void BtnCheckUpdates_Click(object sender, RoutedEventArgs e)
         {
-            TxtUpdateStatus.Text = "Wird geprüft...";
-            Dispatcher.InvokeAsync(async () =>
+            var updateWin = new UpdateCheckWindow();
+            try
             {
-                await System.Threading.Tasks.Task.Delay(600);
-                TxtUpdateStatus.Text = $"{BrandingConfig.BrowserName} v{BrandingConfig.BrowserVersion} ist die aktuellste Version.";
+                updateWin.Owner = this;
+            }
+            catch { }
+            updateWin.ShowDialog();
 
-                var updateWin = new UpdateCheckWindow(isUpdateAvailable: false, availableVersion: BrandingConfig.BrowserVersion);
-                try
-                {
-                    updateWin.Owner = this;
-                }
-                catch { }
-                updateWin.ShowDialog();
-            });
+            TxtUpdateStatus.Text = $"{BrandingConfig.BrowserName} v{BrandingConfig.BrowserVersion} (GitHub geprüft um {DateTime.Now:HH:mm} Uhr).";
         }
 
         private void RadioHome_Checked(object sender, RoutedEventArgs e)

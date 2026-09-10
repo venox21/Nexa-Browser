@@ -38,6 +38,39 @@ namespace Browser.Services
         public List<string> Changelog { get; set; } = new();
     }
 
+    public class GitHubReleaseDto
+    {
+        [JsonPropertyName("tag_name")]
+        public string TagName { get; set; } = string.Empty;
+
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = string.Empty;
+
+        [JsonPropertyName("body")]
+        public string? Body { get; set; }
+
+        [JsonPropertyName("html_url")]
+        public string? HtmlUrl { get; set; }
+
+        [JsonPropertyName("published_at")]
+        public string? PublishedAt { get; set; }
+
+        [JsonPropertyName("assets")]
+        public List<GitHubAssetDto>? Assets { get; set; }
+    }
+
+    public class GitHubAssetDto
+    {
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = string.Empty;
+
+        [JsonPropertyName("browser_download_url")]
+        public string BrowserDownloadUrl { get; set; } = string.Empty;
+
+        [JsonPropertyName("size")]
+        public long Size { get; set; }
+    }
+
     public class UpdateCheckResult
     {
         public bool IsSuccess { get; set; }
@@ -56,7 +89,7 @@ namespace Browser.Services
         public static UpdateService Instance => _lazyInstance.Value;
 
         private const string PrimaryVersionManifestUrl = "https://raw.githubusercontent.com/venox21/Nexa-Browser/main/version.json";
-        private const string GitHubApiLatestReleaseUrl = "https://api.github.com/repos/venox21/Nexa-Browser/releases/latest";
+        private const string GitHubApiReleasesUrl = "https://api.github.com/repos/venox21/Nexa-Browser/releases?per_page=5";
 
         private readonly HttpClient _httpClient;
 
@@ -64,51 +97,151 @@ namespace Browser.Services
         {
             _httpClient = new HttpClient
             {
-                Timeout = TimeSpan.FromSeconds(8)
+                Timeout = TimeSpan.FromSeconds(10)
             };
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "NexaBrowser/2.0 (Windows NT 10.0; Win64; x64)");
+            _httpClient.DefaultRequestHeaders.Add("Accept", "application/vnd.github+json, application/json, text/plain, */*");
         }
 
         public async Task<UpdateCheckResult> CheckForUpdatesAsync()
         {
             var result = new UpdateCheckResult
             {
-                CurrentVersion = BrandingConfig.BrowserVersion
+                CurrentVersion = BrandingConfig.BrowserVersion,
+                LatestVersion = BrandingConfig.BrowserVersion
             };
 
+            var localVer = ParseVersion(BrandingConfig.BrowserVersion);
+            Version highestRemoteVer = localVer;
+            bool foundAnyInfo = false;
+
+            // 1. Fetch version.json from GitHub raw content with cache-buster timestamp
             try
             {
-                // 1. Fetch version.json from GitHub raw content
-                var json = await _httpClient.GetStringAsync(PrimaryVersionManifestUrl);
-                var info = JsonSerializer.Deserialize<UpdateInfo>(json, new JsonSerializerOptions
+                var cacheBustUrl = $"{PrimaryVersionManifestUrl}?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+                using var req = new HttpRequestMessage(HttpMethod.Get, cacheBustUrl);
+                req.Headers.Add("Cache-Control", "no-cache");
+
+                using var resp = await _httpClient.SendAsync(req);
+                if (resp.IsSuccessStatusCode)
                 {
-                    PropertyNameCaseInsensitive = true
-                });
+                    var json = await resp.Content.ReadAsStringAsync();
+                    var info = JsonSerializer.Deserialize<UpdateInfo>(json, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
 
-                if (info != null && !string.IsNullOrWhiteSpace(info.Version))
-                {
-                    result.IsSuccess = true;
-                    result.LatestVersion = info.Version;
-                    result.ReleaseName = info.ReleaseName;
-                    result.DownloadUrl = !string.IsNullOrEmpty(info.DownloadUrl) ? info.DownloadUrl : info.RawSetupUrl;
-                    result.Changelog = info.Changelog ?? new List<string>();
+                    if (info != null && !string.IsNullOrWhiteSpace(info.Version))
+                    {
+                        foundAnyInfo = true;
+                        result.ReleaseName = info.ReleaseName;
+                        result.DownloadUrl = !string.IsNullOrEmpty(info.DownloadUrl) ? info.DownloadUrl : info.RawSetupUrl;
+                        result.Changelog = info.Changelog ?? new List<string>();
 
-                    var localVer = ParseVersion(BrandingConfig.BrowserVersion);
-                    var remoteVer = ParseVersion(info.Version);
-
-                    result.IsUpdateAvailable = remoteVer > localVer;
-                    return result;
+                        var v = ParseVersion(info.Version);
+                        if (v > highestRemoteVer)
+                        {
+                            highestRemoteVer = v;
+                            result.LatestVersion = info.Version;
+                        }
+                    }
                 }
             }
             catch (Exception ex)
             {
-                // Fallback: If network is offline or repo is brand new
-                result.ErrorMessage = ex.Message;
+                Debug.WriteLine($"[UpdateService] Error fetching version.json: {ex.Message}");
             }
 
-            // Return safe result without throwing
-            result.LatestVersion = BrandingConfig.BrowserVersion;
-            result.IsUpdateAvailable = false;
+            // 2. Query GitHub Releases API for releases/tags
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Get, GitHubApiReleasesUrl);
+                using var resp = await _httpClient.SendAsync(req);
+                if (resp.IsSuccessStatusCode)
+                {
+                    var json = await resp.Content.ReadAsStringAsync();
+                    var releases = JsonSerializer.Deserialize<List<GitHubReleaseDto>>(json, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                    if (releases != null)
+                    {
+                        foreach (var rel in releases)
+                        {
+                            var ver = ExtractVersion(rel.TagName);
+                            if (ver == null || ver == new Version(0, 0, 0))
+                            {
+                                ver = ExtractVersion(rel.Name);
+                            }
+
+                            if (ver != null && ver > highestRemoteVer)
+                            {
+                                foundAnyInfo = true;
+                                highestRemoteVer = ver;
+                                result.LatestVersion = ver.ToString();
+                                result.ReleaseName = !string.IsNullOrWhiteSpace(rel.Name) ? rel.Name : $"Nexa Browser v{ver}";
+
+                                // Search for NexaSetup.exe asset
+                                var setupAsset = rel.Assets?.Find(a => a.Name.Equals("NexaSetup.exe", StringComparison.OrdinalIgnoreCase));
+                                if (setupAsset != null && !string.IsNullOrEmpty(setupAsset.BrowserDownloadUrl))
+                                {
+                                    result.DownloadUrl = setupAsset.BrowserDownloadUrl;
+                                }
+                                else if (!string.IsNullOrEmpty(rel.HtmlUrl))
+                                {
+                                    result.DownloadUrl = rel.HtmlUrl;
+                                }
+
+                                // Extract changelog lines from release body
+                                if (!string.IsNullOrWhiteSpace(rel.Body))
+                                {
+                                    var lines = rel.Body.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+                                        .Select(l => l.Trim().TrimStart('-', '*', '•').Trim())
+                                        .Where(l => !string.IsNullOrEmpty(l) && !l.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                                        .Take(6)
+                                        .ToList();
+                                    if (lines.Count > 0)
+                                    {
+                                        result.Changelog = lines;
+                                    }
+                                }
+                            }
+                            else if (!foundAnyInfo && rel.Assets != null)
+                            {
+                                // If version is same or tag is 'Installer', record setup URL
+                                var setupAsset = rel.Assets.Find(a => a.Name.Equals("NexaSetup.exe", StringComparison.OrdinalIgnoreCase));
+                                if (setupAsset != null && !string.IsNullOrEmpty(setupAsset.BrowserDownloadUrl) && string.IsNullOrEmpty(result.DownloadUrl))
+                                {
+                                    result.DownloadUrl = setupAsset.BrowserDownloadUrl;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[UpdateService] Error querying GitHub releases: {ex.Message}");
+            }
+
+            if (foundAnyInfo)
+            {
+                result.IsSuccess = true;
+                result.IsUpdateAvailable = highestRemoteVer > localVer;
+                if (string.IsNullOrEmpty(result.LatestVersion))
+                {
+                    result.LatestVersion = highestRemoteVer.ToString();
+                }
+            }
+            else
+            {
+                result.IsSuccess = false;
+                result.ErrorMessage = "GitHub-Repository konnte nicht erreicht werden.";
+                result.LatestVersion = BrandingConfig.BrowserVersion;
+                result.IsUpdateAvailable = false;
+            }
+
             return result;
         }
 
@@ -203,6 +336,17 @@ namespace Browser.Services
             if (parts.Length == 2 && int.TryParse(parts[0], out int a) && int.TryParse(parts[1], out int b)) return new Version(a, b, 0);
 
             return new Version(0, 0, 0);
+        }
+
+        private static Version? ExtractVersion(string? input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return null;
+            var match = System.Text.RegularExpressions.Regex.Match(input, @"\b(\d+\.\d+(?:\.\d+)?)\b");
+            if (match.Success && Version.TryParse(match.Groups[1].Value, out var parsed))
+            {
+                return parsed;
+            }
+            return null;
         }
     }
 }

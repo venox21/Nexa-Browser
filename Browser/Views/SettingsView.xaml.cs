@@ -405,25 +405,16 @@ namespace Browser.Views
 
         private void BtnCheckUpdates_Click(object sender, RoutedEventArgs e)
         {
-            TxtUpdateStatus.Text = "Prüfe auf Aktualisierungen...";
-            TxtUpdateStatus.Foreground = (Brush)FindResource("AccentLightBrush");
-
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.0) };
-            timer.Tick += (s, args) =>
+            var updateWin = new UpdateCheckWindow();
+            try
             {
-                timer.Stop();
-                TxtUpdateStatus.Text = $"{BrandingConfig.BrowserName} v{BrandingConfig.BrowserVersion} ist die aktuellste Version.";
-                TxtUpdateStatus.Foreground = (Brush)FindResource("TextPrimaryBrush");
+                updateWin.Owner = Window.GetWindow(this);
+            }
+            catch { }
+            updateWin.ShowDialog();
 
-                var updateWin = new UpdateCheckWindow(isUpdateAvailable: false, availableVersion: BrandingConfig.BrowserVersion);
-                try
-                {
-                    updateWin.Owner = Window.GetWindow(this);
-                }
-                catch { }
-                updateWin.ShowDialog();
-            };
-            timer.Start();
+            TxtUpdateStatus.Text = $"{BrandingConfig.BrowserName} v{BrandingConfig.BrowserVersion} (GitHub geprüft um {DateTime.Now:HH:mm} Uhr).";
+            TxtUpdateStatus.Foreground = (Brush)FindResource("TextPrimaryBrush");
         }
 
         private void BtnReset_Click(object sender, RoutedEventArgs e)

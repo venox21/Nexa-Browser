@@ -63,7 +63,14 @@ namespace Browser.Views
                     PanelUpdateAvailable.Visibility = Visibility.Collapsed;
                     PanelUpToDate.Visibility = Visibility.Visible;
 
-                    TxtCurrentVersionPill.Text = $"Version {BrandingConfig.BrowserVersion} (Aktuell)";
+                    if (!result.IsSuccess)
+                    {
+                        TxtCurrentVersionPill.Text = "Offline / GitHub nicht erreichbar";
+                    }
+                    else
+                    {
+                        TxtCurrentVersionPill.Text = $"Version {BrandingConfig.BrowserVersion} (Aktuell)";
+                    }
                     BtnAction.Content = "Schließen";
                     BtnSecondary.Visibility = Visibility.Collapsed;
                 }
