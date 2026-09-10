@@ -1,16 +1,18 @@
 {
-  "version": "2.0.2",
-  "display_version": "v2.0.2",
-  "release_name": "Nexa Browser v2.0.2 – Live GitHub Updater & Bugfixes",
+  "version": "2.0.3",
+  "display_version": "v2.0.3",
+  "release_name": "Nexa Browser v2.0.3 – Passwort-Manager Button & Web-Autofill",
   "release_date": "2026-09-10",
   "download_url": "https://github.com/venox21/Nexa-Browser/releases/download/Installer/NexaSetup.exe",
   "raw_setup_url": "https://github.com/venox21/Nexa-Browser/raw/main/NexaSetup.exe",
   "repository_url": "https://github.com/venox21/Nexa-Browser",
   "min_os_version": "Windows 10 / Windows 11 (64-Bit)",
   "changelog": [
-    "🚀 Direkte GitHub-Repository & Releases Live-Prüfung im Updater",
-    "⚡ Sofortige Erkennung neuer Releases ohne Cache-Verzögerung",
-    "⚙️ Reale Update-Prüfung in den Einstellungen mit Zeitstempel",
-    "🛡️ Verbesserte Fehlerbehandlung bei Offline- und Verbindungsproblemen"
+    "🔑 Neuer Passwort- & Login-Manager Button in der Symbolleiste mit Sofortzugriff",
+    "✨ 1-Klick-Autofill: Logins direkt und fehlerfrei in Web-Formulare einsetzen",
+    "🔍 Schnelle Live-Suche im Login-Menü nach Domain, Benutzername und Titel",
+    "🌐 Intelligente Erkennung der aktuellen Website mit passenden Account-Vorschlägen",
+    "⚡ Volle Kompatibilität mit React, Vue, Angular, Svelte und 2-Schritt-Logins",
+    "📋 Schnell-Kopieren von Passwörtern und Benutzernamen in die Zwischenablage"
   ]
 }

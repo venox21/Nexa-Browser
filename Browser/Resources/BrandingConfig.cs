@@ -7,8 +7,8 @@ namespace Browser.Resources
     public static class BrandingConfig
     {
         public const string BrowserName = "Nexa";
-        public const string BrowserVersion = "2.0.2";
-        public const string BrowserDisplayVersion = "v2.0.2";
+        public const string BrowserVersion = "2.0.3";
+        public const string BrowserDisplayVersion = "v2.0.3";
 
         /// <summary>
         /// Default search engine URL template. {0} is replaced with the search query.
